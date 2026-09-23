@@ -11,12 +11,29 @@ import {
   ShieldCheck, 
   FileSpreadsheet,
   AlertTriangle,
-  ExternalLink
+  ExternalLink,
+  Lock,
+  Key,
+  Check
 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 
 export default function BackupSettings({ data }) {
   const [importStatus, setImportStatus] = useState(null);
+  const [newAdminUser, setNewAdminUser] = useState(data.settings?.adminUser || 'admin');
+  const [newAdminPass, setNewAdminPass] = useState('');
+  const [credStatus, setCredStatus] = useState(null);
+
+  const handleUpdateCreds = (e) => {
+    e.preventDefault();
+    if (!newAdminUser.trim() || !newAdminPass.trim()) {
+      setCredStatus({ type: 'error', text: 'Por favor introduce un usuario y una nueva contraseña válidos.' });
+      return;
+    }
+    storageService.updateAdminCredentials(newAdminUser, newAdminPass);
+    setCredStatus({ type: 'success', text: '¡Credenciales de administrador actualizadas correctamente!' });
+    setNewAdminPass('');
+  };
 
   const handleExportJSON = () => {
     storageService.exportJSON();
@@ -132,6 +149,62 @@ export default function BackupSettings({ data }) {
             Mientras tanto, puedes usar la app directamente, exportar tus respaldos periódicamente en Excel o JSON, y compartir la URL pública de GitHub Pages con los hermanos.
           </p>
         </div>
+      </div>
+
+      {/* Seguridad y Cambio de Credenciales de Administrador */}
+      <div className="glass-panel" style={{ padding: '20px', marginBottom: '20px', border: '1px solid rgba(99, 102, 241, 0.25)' }}>
+        <h4 style={{ fontSize: '1.1rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px', color: '#a5b4fc' }}>
+          <Key size={18} /> Seguridad: Usuario y Contraseña de Administrador
+        </h4>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '16px' }}>
+          Cambia el usuario o la contraseña para restringir el acceso a este panel solo a la persona autorizada.
+        </p>
+
+        {credStatus && (
+          <div style={{
+            padding: '10px 14px',
+            borderRadius: 'var(--radius-sm)',
+            marginBottom: '14px',
+            background: credStatus.type === 'success' ? 'var(--success-light)' : 'var(--danger-light)',
+            color: credStatus.type === 'success' ? '#34d399' : '#f87171',
+            fontSize: '0.85rem',
+            border: `1px solid ${credStatus.type === 'success' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+          }}>
+            {credStatus.text}
+          </div>
+        )}
+
+        <form onSubmit={handleUpdateCreds} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', alignItems: 'flex-end' }}>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label">Nombre de Usuario Admin</label>
+            <input
+              type="text"
+              className="form-input"
+              required
+              value={newAdminUser}
+              onChange={(e) => setNewAdminUser(e.target.value)}
+              placeholder="admin"
+            />
+          </div>
+
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label">Nueva Contraseña</label>
+            <input
+              type="password"
+              className="form-input"
+              required
+              value={newAdminPass}
+              onChange={(e) => setNewAdminPass(e.target.value)}
+              placeholder="Nueva contraseña secreta"
+            />
+          </div>
+
+          <div>
+            <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
+              <Check size={16} /> Guardar Credenciales
+            </button>
+          </div>
+        </form>
       </div>
 
       {/* Restablecer Datos de Demostración */}

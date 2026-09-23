@@ -19,10 +19,14 @@ import AdminPanel from './components/admin/AdminPanel';
 export default function App() {
   const [data, setData] = useState(() => storageService.getData());
   const [viewMode, setViewMode] = useState('checkin'); // 'checkin' | 'admin'
-  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
-  const [adminPinInput, setAdminPinInput] = useState('');
-  const [pinError, setPinError] = useState(false);
-  const [showPinModal, setShowPinModal] = useState(false);
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => {
+    return sessionStorage.getItem('discipulado_admin_auth') === 'true';
+  });
+  const [usernameInput, setUsernameInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [authError, setAuthError] = useState('');
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   // Escuchar cambios reactivos en el almacenamiento
   useEffect(() => {
@@ -33,27 +37,39 @@ export default function App() {
   }, []);
 
   const handleOpenAdmin = () => {
-    // Si ya está desbloqueado en la sesión, ir directo
     if (isAdminUnlocked) {
       setViewMode('admin');
     } else {
-      setShowPinModal(true);
-      setPinError(false);
-      setAdminPinInput('');
+      setShowLoginModal(true);
+      setAuthError('');
+      setUsernameInput('');
+      setPasswordInput('');
     }
   };
 
-  const handleVerifyPin = (e) => {
+  const handleLogin = (e) => {
     e.preventDefault();
-    // Clave predeterminada sencilla para líderes o entrar libremente
-    // Permite "1234" o dejar en blanco / pulsar enter
-    if (adminPinInput === '1234' || adminPinInput === '') {
-      setIsAdminUnlocked(true);
-      setShowPinModal(false);
-      setViewMode('admin');
-    } else {
-      setPinError(true);
+    if (!usernameInput.trim() || !passwordInput) {
+      setAuthError('Por favor completa el usuario y la contraseña.');
+      return;
     }
+
+    const isValid = storageService.validateAdmin(usernameInput, passwordInput);
+    if (isValid) {
+      sessionStorage.setItem('discipulado_admin_auth', 'true');
+      setIsAdminUnlocked(true);
+      setShowLoginModal(false);
+      setViewMode('admin');
+      setAuthError('');
+    } else {
+      setAuthError('Usuario o contraseña incorrectos.');
+    }
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('discipulado_admin_auth');
+    setIsAdminUnlocked(false);
+    setViewMode('checkin');
   };
 
   return (
@@ -71,25 +87,40 @@ export default function App() {
         </div>
 
         {/* Selector de Modo: Fichaje Móvil / Panel Admin */}
-        <nav className="nav-switcher">
-          <button
-            type="button"
-            className={`nav-tab-btn ${viewMode === 'checkin' ? 'active' : ''}`}
-            onClick={() => setViewMode('checkin')}
-          >
-            <Smartphone size={16} />
-            <span>Fichaje Alumno</span>
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <nav className="nav-switcher">
+            <button
+              type="button"
+              className={`nav-tab-btn ${viewMode === 'checkin' ? 'active' : ''}`}
+              onClick={() => setViewMode('checkin')}
+            >
+              <Smartphone size={16} />
+              <span>Fichaje Alumno</span>
+            </button>
 
-          <button
-            type="button"
-            className={`nav-tab-btn ${viewMode === 'admin' ? 'active' : ''}`}
-            onClick={handleOpenAdmin}
-          >
-            <Shield size={16} />
-            <span>Panel Admin</span>
-          </button>
-        </nav>
+            <button
+              type="button"
+              className={`nav-tab-btn ${viewMode === 'admin' ? 'active' : ''}`}
+              onClick={handleOpenAdmin}
+            >
+              <Shield size={16} />
+              <span>Panel Admin</span>
+            </button>
+          </nav>
+
+          {/* Botón de Cerrar Sesión si está autenticado */}
+          {isAdminUnlocked && viewMode === 'admin' && (
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={handleLogout}
+              title="Cerrar Sesión de Administrador"
+              style={{ borderColor: 'rgba(239, 68, 68, 0.4)', color: '#f87171' }}
+            >
+              <Lock size={14} /> Salir
+            </button>
+          )}
+        </div>
       </header>
 
       {/* Contenido Principal */}
@@ -97,61 +128,119 @@ export default function App() {
         {viewMode === 'checkin' ? (
           <StudentCheckIn data={data} />
         ) : (
-          <AdminPanel data={data} />
+          <AdminPanel data={data} onLogout={handleLogout} />
         )}
       </main>
 
-      {/* Modal de Acceso al Panel de Administración */}
-      {showPinModal && (
+      {/* Modal de Acceso de Administrador con Usuario y Contraseña */}
+      {showLoginModal && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '380px', textAlign: 'center', padding: '24px' }}>
-            <div style={{
-              width: '54px',
-              height: '54px',
-              borderRadius: '50%',
-              background: 'rgba(99, 102, 241, 0.15)',
-              color: '#818cf8',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 12px'
-            }}>
-              <Lock size={26} />
+          <div className="modal-content" style={{ maxWidth: '400px', padding: '24px' }}>
+            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+              <div style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                background: 'rgba(99, 102, 241, 0.15)',
+                color: '#818cf8',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 12px'
+              }}>
+                <Shield size={28} />
+              </div>
+
+              <h3 style={{ fontSize: '1.3rem', marginBottom: '6px' }}>Acceso Administrativo</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                Ingresa tus credenciales de administrador para gestionar cursos, estudiantes y asistencias.
+              </p>
             </div>
 
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '6px' }}>Acceso Administrativo</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '16px' }}>
-              Para gestionar estudiantes, profesores o revisar faltas, introduce el PIN de líder (PIN por defecto: <code>1234</code> o pulsa Acceder).
-            </p>
-
-            <form onSubmit={handleVerifyPin}>
+            <form onSubmit={handleLogin}>
               <div className="form-group">
+                <label className="form-label">Usuario</label>
                 <input
-                  type="password"
+                  type="text"
                   className="form-input"
-                  style={{ textAlign: 'center', fontSize: '1.2rem', letterSpacing: '0.2em' }}
-                  placeholder="PIN (1234)"
+                  placeholder="admin"
                   autoFocus
-                  value={adminPinInput}
+                  required
+                  value={usernameInput}
                   onChange={(e) => {
-                    setAdminPinInput(e.target.value);
-                    setPinError(false);
+                    setUsernameInput(e.target.value);
+                    setAuthError('');
                   }}
                 />
               </div>
 
-              {pinError && (
-                <div style={{ color: '#f87171', fontSize: '0.8rem', marginBottom: '12px' }}>
-                  PIN incorrecto. Prueba con 1234.
+              <div className="form-group">
+                <label className="form-label">Contraseña</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    className="form-input"
+                    placeholder="••••••••"
+                    required
+                    value={passwordInput}
+                    onChange={(e) => {
+                      setPasswordInput(e.target.value);
+                      setAuthError('');
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      fontSize: '0.8rem'
+                    }}
+                  >
+                    {showPassword ? 'Ocultar' : 'Ver'}
+                  </button>
+                </div>
+              </div>
+
+              {authError && (
+                <div style={{
+                  color: '#f87171',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '8px 12px',
+                  fontSize: '0.82rem',
+                  marginBottom: '14px'
+                }}>
+                  {authError}
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+              <div style={{
+                background: 'rgba(15, 23, 42, 0.6)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '10px 12px',
+                fontSize: '0.78rem',
+                color: 'var(--text-muted)',
+                marginBottom: '16px',
+                border: '1px solid var(--border-card)'
+              }}>
+                🔑 <strong>Credenciales por defecto:</strong><br />
+                Usuario: <code>admin</code> • Contraseña: <code>password123</code>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
                 <button
                   type="button"
                   className="btn btn-outline"
                   style={{ flex: 1 }}
-                  onClick={() => setShowPinModal(false)}
+                  onClick={() => setShowLoginModal(false)}
                 >
                   Cancelar
                 </button>
@@ -160,7 +249,7 @@ export default function App() {
                   className="btn btn-primary"
                   style={{ flex: 1 }}
                 >
-                  <Unlock size={16} /> Acceder
+                  <Unlock size={16} /> Iniciar Sesión
                 </button>
               </div>
             </form>

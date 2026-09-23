@@ -181,6 +181,8 @@ export const INITIAL_DATA = {
     welcomeMessage: '¡Bienvenido(a)! Que la palabra de hoy sea de gran bendición para tu vida espiritual.',
     allowSelfCheckIn: true,
     requireVerification: false,
+    adminUser: 'admin',
+    adminPassword: 'password123',
   }
 };
 
@@ -415,5 +417,23 @@ export const storageService = {
     document.body.appendChild(link);
     link.click();
     link.remove();
+  },
+
+  // Validar credenciales de administrador
+  validateAdmin(username, password) {
+    const data = this.getData();
+    const expectedUser = data.settings?.adminUser || 'admin';
+    const expectedPass = data.settings?.adminPassword || 'password123';
+    return username.trim() === expectedUser && password === expectedPass;
+  },
+
+  // Actualizar credenciales de administrador
+  updateAdminCredentials(newUsername, newPassword) {
+    const data = this.getData();
+    if (!data.settings) data.settings = {};
+    if (newUsername) data.settings.adminUser = newUsername.trim();
+    if (newPassword) data.settings.adminPassword = newPassword;
+    this.saveData(data);
+    return { success: true };
   }
 };
