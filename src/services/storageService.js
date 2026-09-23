@@ -70,6 +70,7 @@ export const INITIAL_DATA = {
       name: 'Carlos Mendoza',
       documentId: '1001',
       phone: '+34600111222',
+      password: '1234',
       levelId: 'lvl-1',
       status: 'active',
       enrolledAt: '2026-09-01',
@@ -80,6 +81,7 @@ export const INITIAL_DATA = {
       name: 'Lucía Fernández',
       documentId: '1002',
       phone: '+34600222333',
+      password: '1234',
       levelId: 'lvl-1',
       status: 'active',
       enrolledAt: '2026-09-01',
@@ -90,6 +92,7 @@ export const INITIAL_DATA = {
       name: 'Javier Morales',
       documentId: '1003',
       phone: '+34600333444',
+      password: '1234',
       levelId: 'lvl-1',
       status: 'active',
       enrolledAt: '2026-09-01',
@@ -100,6 +103,7 @@ export const INITIAL_DATA = {
       name: 'Ana Sofía Castillo',
       documentId: '1004',
       phone: '+34600444555',
+      password: '1234',
       levelId: 'lvl-1',
       status: 'active',
       enrolledAt: '2026-09-01',
@@ -111,6 +115,7 @@ export const INITIAL_DATA = {
       name: 'Mateo Benítez',
       documentId: '2001',
       phone: '+34611111222',
+      password: '1234',
       levelId: 'lvl-2',
       status: 'active',
       enrolledAt: '2026-08-15',
@@ -121,6 +126,7 @@ export const INITIAL_DATA = {
       name: 'Valentina Restrepo',
       documentId: '2002',
       phone: '+34611222333',
+      password: '1234',
       levelId: 'lvl-2',
       status: 'active',
       enrolledAt: '2026-08-15',
@@ -131,6 +137,7 @@ export const INITIAL_DATA = {
       name: 'Gabriel Quintana',
       documentId: '2003',
       phone: '+34611333444',
+      password: '1234',
       levelId: 'lvl-2',
       status: 'active',
       enrolledAt: '2026-08-15',
@@ -142,6 +149,7 @@ export const INITIAL_DATA = {
       name: 'Daniela Salgado',
       documentId: '3001',
       phone: '+34622111222',
+      password: '1234',
       levelId: 'lvl-3',
       status: 'active',
       enrolledAt: '2026-07-10',
@@ -152,6 +160,7 @@ export const INITIAL_DATA = {
       name: 'Esteban Paredes',
       documentId: '3002',
       phone: '+34622222333',
+      password: '1234',
       levelId: 'lvl-3',
       status: 'active',
       enrolledAt: '2026-07-10',
@@ -194,7 +203,14 @@ export const storageService = {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        if (parsed.students) {
+          parsed.students = parsed.students.map(s => ({
+            ...s,
+            password: s.password || '1234'
+          }));
+        }
+        return parsed;
       }
     } catch (e) {
       console.error('Error al leer de localStorage:', e);
@@ -364,11 +380,18 @@ export const storageService = {
     const data = this.getData();
     if (student.id) {
       const idx = data.students.findIndex(s => s.id === student.id);
-      if (idx >= 0) data.students[idx] = { ...data.students[idx], ...student };
+      if (idx >= 0) {
+        data.students[idx] = { 
+          ...data.students[idx], 
+          ...student,
+          password: student.password || data.students[idx].password || '1234'
+        };
+      }
     } else {
       const newStudent = {
         ...student,
         id: `std-${Date.now()}`,
+        password: student.password || '1234',
         status: student.status || 'active',
         enrolledAt: student.enrolledAt || new Date().toISOString().slice(0, 10),
       };
@@ -383,6 +406,50 @@ export const storageService = {
     // Eliminar también sus asistencias
     data.attendance = data.attendance.filter(a => a.studentId !== studentId);
     this.saveData(data);
+  },
+
+  // Validar fichaje del estudiante por teléfono y contraseña
+  validateStudentForCheckIn(phoneInput, passwordInput, targetLevelId = null) {
+    const data = this.getData();
+    const cleanInput = (phoneInput || '').replace(/[^0-9]/g, '');
+    if (!cleanInput) {
+      return { success: false, error: 'Por favor ingresa tu número de teléfono.' };
+    }
+    if (!passwordInput) {
+      return { success: false, error: 'Por favor ingresa tu contraseña de estudiante.' };
+    }
+
+    const student = data.students.find(s => {
+      const cleanStudentPhone = (s.phone || '').replace(/[^0-9]/g, '');
+      return cleanStudentPhone && (
+        cleanStudentPhone === cleanInput || 
+        cleanStudentPhone.endsWith(cleanInput) || 
+        cleanInput.endsWith(cleanStudentPhone)
+      );
+    });
+
+    if (!student) {
+      return { success: false, error: 'No se encontró ningún estudiante con ese número de teléfono.' };
+    }
+
+    if (student.status !== 'active') {
+      return { success: false, error: 'El estudiante no se encuentra en estado activo.' };
+    }
+
+    const expectedPass = student.password || '1234';
+    if (passwordInput !== expectedPass) {
+      return { success: false, error: 'Contraseña de estudiante incorrecta.' };
+    }
+
+    if (targetLevelId && student.levelId !== targetLevelId) {
+      const actualLevel = data.levels.find(l => l.id === student.levelId);
+      return { 
+        success: false, 
+        error: `Estás registrado(a) en "${actualLevel?.name || 'otro nivel'}". Por favor selecciona ese nivel para fichar.` 
+      };
+    }
+
+    return { success: true, student };
   },
 
   // Exportar Asistencias a CSV

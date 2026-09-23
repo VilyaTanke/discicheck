@@ -2,7 +2,7 @@
 // Gestión de Estudiantes: creación, edición, asignación/cambio de nivel y búsqueda
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Edit2, Trash2, Search, Phone, BookOpen, User, Check, X, Filter, MessageCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Phone, BookOpen, User, Check, X, Filter, MessageCircle, Key } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 
 export default function StudentsManager({ data }) {
@@ -18,6 +18,7 @@ export default function StudentsManager({ data }) {
     name: '',
     documentId: '',
     phone: '',
+    password: '1234',
     levelId: '',
     status: 'active',
     notes: '',
@@ -47,6 +48,7 @@ export default function StudentsManager({ data }) {
       name: '',
       documentId: '',
       phone: '',
+      password: '1234',
       levelId: levels[0]?.id || '',
       status: 'active',
       notes: '',
@@ -60,6 +62,7 @@ export default function StudentsManager({ data }) {
       name: student.name,
       documentId: student.documentId || '',
       phone: student.phone || '',
+      password: student.password || '1234',
       levelId: student.levelId || levels[0]?.id || '',
       status: student.status || 'active',
       notes: student.notes || '',
@@ -154,6 +157,7 @@ export default function StudentsManager({ data }) {
               <th style={{ padding: '12px 16px' }}>Documento / ID</th>
               <th style={{ padding: '12px 16px' }}>Nivel Asignado</th>
               <th style={{ padding: '12px 16px' }}>Teléfono</th>
+              <th style={{ padding: '12px 16px' }}>Contraseña</th>
               <th style={{ padding: '12px 16px' }}>Asistencias</th>
               <th style={{ padding: '12px 16px' }}>Estado</th>
               <th style={{ padding: '12px 16px', textAlign: 'right' }}>Acciones</th>
@@ -200,6 +204,11 @@ export default function StudentsManager({ data }) {
                       ) : (
                         <span style={{ color: 'var(--text-faint)' }}>—</span>
                       )}
+                    </td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <span style={{ fontFamily: 'monospace', color: '#a5b4fc', background: 'rgba(99, 102, 241, 0.1)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.82rem' }}>
+                        {student.password || '1234'}
+                      </span>
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <span className="badge badge-present">
@@ -300,17 +309,15 @@ export default function StudentsManager({ data }) {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div className="form-group">
-                    <label className="form-label">Nivel Asignado *</label>
-                    <select
-                      className="form-select"
+                    <label className="form-label">Contraseña para Fichar *</label>
+                    <input
+                      type="text"
+                      className="form-input"
                       required
-                      value={formData.levelId}
-                      onChange={(e) => setFormData({ ...formData, levelId: e.target.value })}
-                    >
-                      {levels.map(l => (
-                        <option key={l.id} value={l.id}>{l.name}</option>
-                      ))}
-                    </select>
+                      placeholder="1234"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    />
                   </div>
 
                   <div className="form-group">
@@ -325,6 +332,20 @@ export default function StudentsManager({ data }) {
                       <option value="graduated">Graduado</option>
                     </select>
                   </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Nivel Asignado *</label>
+                  <select
+                    className="form-select"
+                    required
+                    value={formData.levelId}
+                    onChange={(e) => setFormData({ ...formData, levelId: e.target.value })}
+                  >
+                    {levels.map(l => (
+                      <option key={l.id} value={l.id}>{l.name}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="form-group">

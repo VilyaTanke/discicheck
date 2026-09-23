@@ -1,19 +1,21 @@
 // src/components/StudentCheckIn.jsx
-// Vista de Fichaje para el estudiante desde su teléfono móvil
+// Vista de Fichaje para el estudiante: Ingreso con Teléfono y Contraseña personal
 
 import React, { useState, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import { 
   CheckCircle2, 
   UserCheck, 
-  Search, 
+  Phone, 
+  Lock, 
   Calendar, 
   Clock, 
   MapPin, 
   Sparkles, 
   AlertTriangle,
   RotateCcw,
-  BookOpen
+  BookOpen,
+  Info
 } from 'lucide-react';
 import { storageService } from '../services/storageService';
 
@@ -32,8 +34,11 @@ export default function StudentCheckIn({ data }) {
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   const [selectedLevelId, setSelectedLevelId] = useState(levels[0]?.id || '');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [phoneInput, setPhoneInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [alreadyCheckedIn, setAlreadyCheckedIn] = useState(null);
   const [justCheckedIn, setJustCheckedIn] = useState(null); // Almacena el resultado para la pantalla de éxito
 
   // Nivel seleccionado actualmente
@@ -47,44 +52,54 @@ export default function StudentCheckIn({ data }) {
     return teachers.find(t => t.id === currentLevel.teacherId);
   }, [teachers, currentLevel]);
 
-  // Estudiantes inscritos en este nivel
-  const levelStudents = useMemo(() => {
-    return students.filter(s => s.levelId === selectedLevelId && s.status === 'active');
-  }, [students, selectedLevelId]);
-
-  // Filtrado de estudiantes por búsqueda
-  const filteredStudents = useMemo(() => {
-    if (!searchTerm.trim()) return [];
-    const term = searchTerm.toLowerCase();
-    return levelStudents.filter(s => 
-      s.name.toLowerCase().includes(term) ||
-      (s.documentId && s.documentId.toLowerCase().includes(term)) ||
-      (s.phone && s.phone.includes(term))
-    );
-  }, [levelStudents, searchTerm]);
-
-  // Verificar si el estudiante seleccionado ya fichó hoy
-  const existingAttendance = useMemo(() => {
-    if (!selectedStudent || !selectedLevelId) return null;
-    return storageService.hasCheckedInToday(selectedStudent.id, selectedLevelId, todayStr);
-  }, [selectedStudent, selectedLevelId, todayStr, data.attendance]);
-
   // Formato amigable de la fecha de hoy
   const formattedToday = useMemo(() => {
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     return new Date().toLocaleDateString('es-ES', options);
   }, []);
 
-  const handleSelectStudent = (student) => {
-    setSelectedStudent(student);
-    setSearchTerm('');
-  };
+  // Alumnos de ejemplo de este nivel para ayudar a probar en modo demo
+  const sampleLevelStudents = useMemo(() => {
+    return students.filter(s => s.levelId === selectedLevelId && s.status === 'active').slice(0, 4);
+  }, [students, selectedLevelId]);
 
-  const handleFichar = () => {
-    if (!selectedStudent || !selectedLevelId) return;
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setErrorMessage('');
+    setAlreadyCheckedIn(null);
 
+    if (!phoneInput.trim()) {
+      setErrorMessage('Por favor introduce tu número de teléfono.');
+      return;
+    }
+    if (!passwordInput.trim()) {
+      setErrorMessage('Por favor introduce tu contraseña.');
+      return;
+    }
+
+    // Validar estudiante por teléfono y contraseña
+    const validation = storageService.validateStudentForCheckIn(phoneInput, passwordInput, selectedLevelId);
+
+    if (!validation.success) {
+      setErrorMessage(validation.error);
+      return;
+    }
+
+    const student = validation.student;
+
+    // Verificar si ya fichó hoy
+    const existing = storageService.hasCheckedInToday(student.id, selectedLevelId, todayStr);
+    if (existing) {
+      setAlreadyCheckedIn({
+        student,
+        time: new Date(existing.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+      });
+      return;
+    }
+
+    // Registrar asistencia
     const result = storageService.recordAttendance({
-      studentId: selectedStudent.id,
+      studentId: student.id,
       levelId: selectedLevelId,
       date: todayStr,
       status: 'present',
@@ -98,24 +113,37 @@ export default function StudentCheckIn({ data }) {
         spread: 70,
         origin: { y: 0.6 }
       });
-    } catch (e) {
+    } catch (err) {
       console.log('Confetti effect');
     }
 
     const randomVerse = INSPIRATIONAL_VERSES[Math.floor(Math.random() * INSPIRATIONAL_VERSES.length)];
 
     setJustCheckedIn({
-      student: selectedStudent,
+      student,
       level: currentLevel,
       time: new Date(result.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
       verse: randomVerse
     });
+
+    // Limpiar campos
+    setPhoneInput('');
+    setPasswordInput('');
   };
 
   const handleResetForAnother = () => {
-    setSelectedStudent(null);
-    setSearchTerm('');
+    setPhoneInput('');
+    setPasswordInput('');
+    setErrorMessage('');
+    setAlreadyCheckedIn(null);
     setJustCheckedIn(null);
+  };
+
+  const handleSelectSample = (samplePhone) => {
+    setPhoneInput(samplePhone);
+    setPasswordInput('1234');
+    setErrorMessage('');
+    setAlreadyCheckedIn(null);
   };
 
   return (
@@ -128,9 +156,9 @@ export default function StudentCheckIn({ data }) {
             {formattedToday}
           </span>
         </div>
-        <h2 style={{ fontSize: '1.6rem', marginBottom: '8px' }}>Punto de Fichaje Móvil</h2>
+        <h2 style={{ fontSize: '1.6rem', marginBottom: '8px' }}>Fichaje de Asistencia</h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-          Selecciona tu curso de discipulado y confirma tu asistencia a la clase de hoy.
+          Ingresa con tu número de teléfono y tu contraseña personal para confirmar tu asistencia a la clase.
         </p>
       </div>
 
@@ -208,7 +236,8 @@ export default function StudentCheckIn({ data }) {
                 type="button"
                 onClick={() => {
                   setSelectedLevelId(level.id);
-                  setSelectedStudent(null);
+                  setErrorMessage('');
+                  setAlreadyCheckedIn(null);
                 }}
                 style={{
                   background: isSelected ? 'rgba(99, 102, 241, 0.2)' : 'rgba(15, 23, 42, 0.6)',
@@ -268,179 +297,142 @@ export default function StudentCheckIn({ data }) {
         )}
       </div>
 
-      {/* 2. Identificación del Estudiante */}
-      <div className="glass-panel" style={{ padding: '20px', marginBottom: '20px' }}>
-        <label className="form-label" style={{ marginBottom: '8px', display: 'block' }}>
-          2. Identifícate para fichar:
-        </label>
+      {/* 2. Formulario de Fichaje con Teléfono y Contraseña */}
+      <div className="glass-panel" style={{ padding: '24px', marginBottom: '20px' }}>
+        <h3 style={{ fontSize: '1.2rem', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <UserCheck size={20} color="#34d399" /> 2. Fichar Asistencia con tu Teléfono
+        </h3>
 
-        {!selectedStudent ? (
-          <div>
-            <div style={{ position: 'relative', marginBottom: '10px' }}>
-              <Search size={18} style={{ position: 'absolute', left: '14px', top: '14px', color: 'var(--text-muted)' }} />
-              <input
-                type="text"
-                className="form-input"
-                style={{ paddingLeft: '40px' }}
-                placeholder="Escribe tu nombre, apellido o DNI..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-
-            {/* Resultados de Búsqueda / Autocompletado */}
-            {searchTerm.trim().length > 0 && (
-              <div style={{
-                maxHeight: '220px',
-                overflowY: 'auto',
-                background: 'rgba(15, 23, 42, 0.95)',
-                border: '1px solid var(--border-card)',
-                borderRadius: 'var(--radius-md)',
-                marginTop: '6px',
-                boxShadow: 'var(--shadow-md)'
-              }}>
-                {filteredStudents.length > 0 ? (
-                  filteredStudents.map(student => (
-                    <div
-                      key={student.id}
-                      onClick={() => handleSelectStudent(student)}
-                      style={{
-                        padding: '12px 16px',
-                        borderBottom: '1px solid var(--border-card)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        transition: 'background 0.15s ease'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(99, 102, 241, 0.15)'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                    >
-                      <div>
-                        <div style={{ fontWeight: '600', color: 'white' }}>{student.name}</div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                          DNI/ID: {student.documentId || 'Sin ID'} • Tel: {student.phone || 'N/A'}
-                        </div>
-                      </div>
-                      <span className="btn btn-outline btn-sm">Elegir</span>
-                    </div>
-                  ))
-                ) : (
-                  <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                    No se encontró a ningún estudiante activo con ese nombre en este nivel.
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Acceso rápido a lista de alumnos de este nivel */}
-            {!searchTerm && levelStudents.length > 0 && (
-              <div style={{ marginTop: '12px' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-faint)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.05em' }}>
-                  Alumnos inscritos en este nivel ({levelStudents.length}):
-                </span>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px', maxHeight: '120px', overflowY: 'auto' }}>
-                  {levelStudents.map(s => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => handleSelectStudent(s)}
-                      className="btn btn-outline btn-sm"
-                      style={{ fontSize: '0.8rem', padding: '5px 10px' }}
-                    >
-                      {s.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          /* Estudiante Seleccionado */
+        {alreadyCheckedIn && (
           <div style={{
-            background: 'rgba(99, 102, 241, 0.08)',
-            border: '1px solid rgba(99, 102, 241, 0.3)',
-            borderRadius: 'var(--radius-md)',
             padding: '16px',
+            borderRadius: 'var(--radius-md)',
+            marginBottom: '16px',
+            background: 'var(--success-light)',
+            border: '1px solid rgba(16, 185, 129, 0.4)',
+            textAlign: 'center'
+          }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#34d399', fontWeight: '700', fontSize: '1rem', marginBottom: '4px' }}>
+              <CheckCircle2 size={20} /> ¡Ya has registrado tu asistencia hoy!
+            </div>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+              Hola <strong>{alreadyCheckedIn.student.name}</strong>, fichaste a las <strong>{alreadyCheckedIn.time}</strong> en {currentLevel.name}. ¡Bendiciones!
+            </p>
+          </div>
+        )}
+
+        {errorMessage && (
+          <div style={{
+            padding: '12px 14px',
+            borderRadius: 'var(--radius-sm)',
+            marginBottom: '16px',
+            background: 'var(--danger-light)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            color: '#f87171',
+            fontSize: '0.88rem',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px'
+            gap: '8px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                width: '46px',
-                height: '46px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: '700',
-                color: 'white',
-                fontSize: '1.1rem'
-              }}>
-                {selectedStudent.name.charAt(0)}
-              </div>
-              <div>
-                <div style={{ fontWeight: '700', fontSize: '1.05rem', color: 'white' }}>
-                  {selectedStudent.name}
-                </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  ID: {selectedStudent.documentId || '—'} • {currentLevel.name.split('-')[0].trim()}
-                </div>
-              </div>
-            </div>
+            <AlertTriangle size={18} />
+            <span>{errorMessage}</span>
+          </div>
+        )}
 
-            <button 
-              type="button"
-              className="btn btn-outline btn-sm"
-              onClick={() => setSelectedStudent(null)}
-              title="Cambiar estudiante"
-            >
-              Cambiar
-            </button>
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Phone size={14} color="#818cf8" /> Tu Número de Teléfono
+            </label>
+            <input
+              type="tel"
+              className="form-input"
+              required
+              placeholder="Ej. 600111222 o +34600111222"
+              value={phoneInput}
+              onChange={(e) => {
+                setPhoneInput(e.target.value);
+                setErrorMessage('');
+                setAlreadyCheckedIn(null);
+              }}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Lock size={14} color="#818cf8" /> Tu Contraseña de Estudiante
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                className="form-input"
+                required
+                placeholder="Introduce tu contraseña"
+                value={passwordInput}
+                onChange={(e) => {
+                  setPasswordInput(e.target.value);
+                  setErrorMessage('');
+                  setAlreadyCheckedIn(null);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  fontSize: '0.8rem'
+                }}
+              >
+                {showPassword ? 'Ocultar' : 'Ver'}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="btn btn-success btn-lg pulse-success"
+            style={{ width: '100%', padding: '16px', fontSize: '1.1rem', marginTop: '10px' }}
+          >
+            <UserCheck size={22} /> VERIFICAR Y FICHAR ASISTENCIA
+          </button>
+        </form>
+
+        {/* Ayuda de prueba / Modo demo */}
+        {sampleLevelStudents.length > 0 && (
+          <div style={{
+            marginTop: '20px',
+            paddingTop: '16px',
+            borderTop: '1px solid var(--border-card)',
+            fontSize: '0.78rem',
+            color: 'var(--text-muted)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', color: '#a5b4fc', fontWeight: '600' }}>
+              <Info size={14} /> Estudiantes de prueba para {currentLevel.name.split('-')[0].trim()} (Contraseña por defecto: <code>1234</code>):
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {sampleLevelStudents.map(s => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => handleSelectSample(s.phone)}
+                  className="btn btn-outline btn-sm"
+                  style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+                  title={`Tel: ${s.phone}`}
+                >
+                  {s.name} ({s.phone})
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
-
-      {/* 3. Botón de Fichaje o Mensaje de "Ya Fichó" */}
-      {selectedStudent && (
-        <div style={{ marginTop: '10px' }}>
-          {existingAttendance ? (
-            <div className="glass-panel" style={{
-              padding: '18px',
-              textAlign: 'center',
-              border: '1px solid rgba(16, 185, 129, 0.4)',
-              background: 'rgba(16, 185, 129, 0.08)'
-            }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: '#34d399', fontWeight: '700', marginBottom: '6px' }}>
-                <CheckCircle2 size={20} /> ¡Ya has fichado asistencia hoy!
-              </div>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                Fichaste a las {new Date(existingAttendance.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}. ¡Que disfrutes tu clase!
-              </p>
-              <button 
-                type="button" 
-                className="btn btn-outline btn-sm" 
-                style={{ marginTop: '12px' }}
-                onClick={() => setSelectedStudent(null)}
-              >
-                Fichar a otra persona
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="btn btn-success btn-lg pulse-success"
-              style={{ width: '100%', padding: '16px', fontSize: '1.15rem' }}
-              onClick={handleFichar}
-            >
-              <UserCheck size={24} /> ¡FICHAR ASISTENCIA DE HOY!
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 }
