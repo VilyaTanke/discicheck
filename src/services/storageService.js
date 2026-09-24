@@ -254,6 +254,21 @@ export const storageService = {
     return INITIAL_DATA;
   },
 
+  // Resetear la base de datos completa a cero (modo producción con datos reales)
+  // Deja la base de datos en 0: vacía todos los estudiantes y registros de asistencias,
+  // conservando la estructura de niveles y las configuraciones/credenciales actuales.
+  clearAllData() {
+    const currentData = this.getData();
+    const emptyData = {
+      ...INITIAL_DATA,
+      students: [],
+      attendance: [],
+      settings: currentData.settings || INITIAL_DATA.settings
+    };
+    this.saveData(emptyData);
+    return emptyData;
+  },
+
   // Exportar Backup JSON completo
   exportJSON() {
     const data = this.getData();

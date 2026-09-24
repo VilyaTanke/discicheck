@@ -18,7 +18,8 @@ import {
   Church,
   MapPin,
   Phone,
-  User
+  User,
+  Trash2
 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 import { exportExcelReport } from '../../services/excelExportService';
@@ -80,9 +81,28 @@ export default function BackupSettings({ data }) {
   };
 
   const handleReset = () => {
-    if (window.confirm('¿Deseas restablecer los datos a los valores iniciales de demostración (Niveles 1, 2 y 3)? Se perderán los cambios locales no exportados.')) {
+    if (window.confirm('¿Deseas restablecer los datos a los valores iniciales de demostración (Niveles 1, 2 y 3 con estudiantes de prueba)? Se perderán los cambios locales no exportados.')) {
       storageService.resetData();
-      setImportStatus({ type: 'success', text: 'Datos restablecidos a la configuración inicial.' });
+      setImportStatus({ type: 'success', text: 'Datos restablecidos a la configuración de prueba inicial.' });
+    }
+  };
+
+  const handleClearAll = () => {
+    const confirmed = window.confirm(
+      '⚠️ ¿Estás completamente seguro de VACIAR LA BASE DE DATOS?\n\n' +
+      '• Se eliminarán TODOS los estudiantes inscritos.\n' +
+      '• Se borrarán TODOS los registros de asistencia.\n' +
+      '• La aplicación quedará en 0, lista para empezar con datos reales.\n' +
+      '• Se mantendrán los Niveles de discipulado, los datos de la iglesia y tus credenciales de admin.\n\n' +
+      'Esta acción no se puede deshacer. ¿Deseas continuar?'
+    );
+
+    if (confirmed) {
+      storageService.clearAllData();
+      setImportStatus({ 
+        type: 'success', 
+        text: '¡Base de datos reseteada a 0! Se han eliminado todos los estudiantes y asistencias de prueba. Lista para uso real.' 
+      });
     }
   };
 
@@ -293,16 +313,25 @@ export default function BackupSettings({ data }) {
       </div>
 
       {/* ═══ Zona de Mantenimiento ═══ */}
-      <div className="glass-panel" style={{ padding: '20px', borderColor: 'rgba(239, 68, 68, 0.2)' }}>
+      <div className="glass-panel" style={{ padding: '20px', borderColor: 'rgba(239, 68, 68, 0.25)' }}>
         <h4 style={{ fontSize: '1.1rem', marginBottom: '8px', color: '#f87171', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <AlertTriangle size={18} /> Zona de Mantenimiento
         </h4>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '14px' }}>
-          Si deseas reiniciar la aplicación a los datos de prueba iniciales (Niveles 1, 2 y 3 con ejemplos de estudiantes y asistencias):
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '14px', lineHeight: '1.5' }}>
+          Opciones para reiniciar la base de datos de la aplicación. Te sugerimos descargar una copia de seguridad en JSON o Excel antes de ejecutar estas acciones.
         </p>
-        <button className="btn btn-danger-outline btn-sm" onClick={handleReset}>
-          <RefreshCw size={14} /> Restablecer a Datos de Prueba Iniciales
-        </button>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button className="btn btn-danger-outline btn-sm" onClick={handleReset}>
+            <RefreshCw size={14} /> Restablecer a Datos de Prueba Iniciales
+          </button>
+          <button 
+            className="btn btn-danger btn-sm" 
+            onClick={handleClearAll}
+            title="Elimina todos los estudiantes y asistencias para empezar de cero"
+          >
+            <Trash2 size={14} /> Resetear Base de Datos a Cero (Modo Real)
+          </button>
+        </div>
       </div>
     </div>
   );

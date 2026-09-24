@@ -519,6 +519,19 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--danger-bg);
 }
 
+.btn-danger {
+  background: var(--danger);
+  color: #FFFFFF;
+  border: 1.5px solid #dc2626;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.35);
+  transform: translateY(-1px);
+}
+
 .btn-sm {
   padding: 6px 14px;
   font-size: 0.8rem;
