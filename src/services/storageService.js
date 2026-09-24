@@ -47,6 +47,7 @@ export const INITIAL_DATA = {
       phone: '+34 611 223 344',
       email: 'andres.romero@iglesia.org',
       role: 'Coordinador Nivel 1',
+      password: '1234',
     },
     {
       id: 'tch-2',
@@ -54,6 +55,7 @@ export const INITIAL_DATA = {
       phone: '+34 622 334 455',
       email: 'miriam.valdes@iglesia.org',
       role: 'Coordinadora Nivel 2',
+      password: '1234',
     },
     {
       id: 'tch-3',
@@ -61,6 +63,7 @@ export const INITIAL_DATA = {
       phone: '+34 633 445 566',
       email: 'david.gomez@iglesia.org',
       role: 'Coordinador Nivel 3',
+      password: '1234',
     },
   ],
   students: [
@@ -208,6 +211,12 @@ export const storageService = {
           parsed.students = parsed.students.map(s => ({
             ...s,
             password: s.password || '1234'
+          }));
+        }
+        if (parsed.teachers) {
+          parsed.teachers = parsed.teachers.map(t => ({
+            ...t,
+            password: t.password || '1234'
           }));
         }
         return parsed;
@@ -373,11 +382,18 @@ export const storageService = {
     const data = this.getData();
     if (teacher.id) {
       const idx = data.teachers.findIndex(t => t.id === teacher.id);
-      if (idx >= 0) data.teachers[idx] = { ...data.teachers[idx], ...teacher };
+      if (idx >= 0) {
+        data.teachers[idx] = { 
+          ...data.teachers[idx], 
+          ...teacher,
+          password: teacher.password || data.teachers[idx].password || '1234'
+        };
+      }
     } else {
       const newTeacher = {
         ...teacher,
         id: `tch-${Date.now()}`,
+        password: teacher.password || '1234',
       };
       data.teachers.push(newTeacher);
     }
@@ -388,6 +404,38 @@ export const storageService = {
     const data = this.getData();
     data.teachers = data.teachers.filter(t => t.id !== teacherId);
     this.saveData(data);
+  },
+
+  // Validar acceso del profesor por teléfono y contraseña
+  validateTeacher(phoneInput, passwordInput) {
+    const data = this.getData();
+    const cleanInput = (phoneInput || '').replace(/[^0-9]/g, '');
+    if (!cleanInput) {
+      return { success: false, error: 'Por favor ingresa tu número de teléfono registrado.' };
+    }
+    if (!passwordInput) {
+      return { success: false, error: 'Por favor ingresa tu contraseña de profesor.' };
+    }
+
+    const teacher = (data.teachers || []).find(t => {
+      const cleanTeacherPhone = (t.phone || '').replace(/[^0-9]/g, '');
+      return cleanTeacherPhone && (
+        cleanTeacherPhone === cleanInput || 
+        cleanTeacherPhone.endsWith(cleanInput) || 
+        cleanInput.endsWith(cleanTeacherPhone)
+      );
+    });
+
+    if (!teacher) {
+      return { success: false, error: 'No se encontró ningún profesor con ese número de teléfono.' };
+    }
+
+    const expectedPass = teacher.password || '1234';
+    if (passwordInput !== expectedPass) {
+      return { success: false, error: 'Contraseña de profesor incorrecta.' };
+    }
+
+    return { success: true, teacher };
   },
 
   // Gestión de Estudiantes

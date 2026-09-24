@@ -2,7 +2,7 @@
 // Gestión de Profesores y Facilitadores de los Cursos de Discipulado
 
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, Phone, Mail, BookOpen, User, Check, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Phone, Mail, BookOpen, User, Check, X, Key } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 
 export default function TeachersManager({ data }) {
@@ -15,6 +15,7 @@ export default function TeachersManager({ data }) {
     phone: '',
     email: '',
     role: '',
+    password: '1234',
   });
 
   const openNewModal = () => {
@@ -24,6 +25,7 @@ export default function TeachersManager({ data }) {
       phone: '',
       email: '',
       role: 'Profesor de Discipulado',
+      password: '1234',
     });
     setIsModalOpen(true);
   };
@@ -35,6 +37,7 @@ export default function TeachersManager({ data }) {
       phone: teacher.phone || '',
       email: teacher.email || '',
       role: teacher.role || '',
+      password: teacher.password || '1234',
     });
     setIsModalOpen(true);
   };
@@ -143,6 +146,10 @@ export default function TeachersManager({ data }) {
                       <span>{teacher.email}</span>
                     </div>
                   )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: 'var(--text-faint)' }}>
+                    <Key size={13} color="#f59e0b" />
+                    <span>Clave de acceso: <strong style={{ color: 'var(--text-main)', fontFamily: 'monospace' }}>{teacher.password || '1234'}</strong></span>
+                  </div>
                 </div>
               </div>
 
@@ -235,6 +242,23 @@ export default function TeachersManager({ data }) {
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Key size={14} color="#f59e0b" /> Contraseña de Acceso al Panel
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="1234"
+                    required
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  />
+                  <small style={{ color: 'var(--text-faint)', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                    El profesor usará su teléfono y esta clave para acceder a su panel.
+                  </small>
                 </div>
               </div>
 
