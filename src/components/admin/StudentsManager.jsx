@@ -1,8 +1,8 @@
 // src/components/admin/StudentsManager.jsx
 // Gestión de Estudiantes: creación, edición, asignación/cambio de nivel y búsqueda
 
-import React, { useState, useMemo } from 'react';
-import { Plus, Edit2, Trash2, Search, Phone, BookOpen, User, Check, X, Filter, MessageCircle, Key } from 'lucide-react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Plus, Edit2, Trash2, Search, Phone, BookOpen, User, Check, X, Filter, MessageCircle, Key, CheckCircle2, AlertTriangle, GraduationCap, IdCard } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 
 export default function StudentsManager({ data }) {
@@ -14,6 +14,10 @@ export default function StudentsManager({ data }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
 
+  // Popover state: which student's popover is open
+  const [popoverStudentId, setPopoverStudentId] = useState(null);
+  const popoverRef = useRef(null);
+
   const [formData, setFormData] = useState({
     name: '',
     documentId: '',
@@ -23,6 +27,19 @@ export default function StudentsManager({ data }) {
     status: 'active',
     notes: '',
   });
+
+  // Close popover when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target)) {
+        setPopoverStudentId(null);
+      }
+    };
+    if (popoverStudentId) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [popoverStudentId]);
 
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
@@ -93,6 +110,36 @@ export default function StudentsManager({ data }) {
     return attendance.filter(a => a.studentId === studentId && a.status === 'present').length;
   };
 
+  // Render status icon based on student status
+  const renderStatusIcon = (status) => {
+    if (status === 'active') {
+      return (
+        <span className="status-icon status-icon--active" title="Activo">
+          <CheckCircle2 size={17} />
+        </span>
+      );
+    }
+    if (status === 'inactive') {
+      return (
+        <span className="status-icon status-icon--inactive" title="Inactivo">
+          <AlertTriangle size={17} />
+        </span>
+      );
+    }
+    if (status === 'graduated') {
+      return (
+        <span className="status-icon status-icon--graduated" title="Graduado">
+          <GraduationCap size={17} />
+        </span>
+      );
+    }
+    return <span>—</span>;
+  };
+
+  const togglePopover = (studentId) => {
+    setPopoverStudentId(prev => prev === studentId ? null : studentId);
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
@@ -154,12 +201,10 @@ export default function StudentsManager({ data }) {
           <thead>
             <tr style={{ borderBottom: '1.5px solid var(--border-card)', background: 'var(--c-sky-lightest)', color: '#1A365D' }}>
               <th style={{ padding: '12px 16px' }}>Estudiante</th>
-              <th style={{ padding: '12px 16px' }}>Documento / ID</th>
               <th style={{ padding: '12px 16px' }}>Nivel Asignado</th>
-              <th style={{ padding: '12px 16px' }}>Teléfono</th>
               <th style={{ padding: '12px 16px' }}>Contraseña</th>
               <th style={{ padding: '12px 16px' }}>Asistencias</th>
-              <th style={{ padding: '12px 16px' }}>Estado</th>
+              <th style={{ padding: '12px 16px', textAlign: 'center' }}>Estado</th>
               <th style={{ padding: '12px 16px', textAlign: 'right' }}>Acciones</th>
             </tr>
           </thead>
@@ -168,6 +213,7 @@ export default function StudentsManager({ data }) {
               filteredStudents.map(student => {
                 const level = levels.find(l => l.id === student.levelId);
                 const presents = getAttendanceCount(student.id);
+                const isPopoverOpen = popoverStudentId === student.id;
 
                 return (
                   <tr 
@@ -177,33 +223,52 @@ export default function StudentsManager({ data }) {
                     onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                   >
                     <td style={{ padding: '12px 16px' }}>
-                      <div style={{ fontWeight: '700', color: 'var(--text-main)' }}>{student.name}</div>
-                      {student.notes && (
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-faint)' }}>{student.notes}</div>
-                      )}
-                    </td>
-                    <td style={{ padding: '12px 16px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-                      {student.documentId || '—'}
+                      <div className="student-name-cell" ref={isPopoverOpen ? popoverRef : null}>
+                        <span
+                          className="student-name-link"
+                          onClick={() => togglePopover(student.id)}
+                        >
+                          {student.name}
+                        </span>
+                        {student.notes && (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-faint)', marginTop: '2px' }}>{student.notes}</div>
+                        )}
+
+                        {/* Popover con datos ocultos */}
+                        {isPopoverOpen && (
+                          <div className="student-popover">
+                            <div className="popover-row">
+                              <IdCard size={14} style={{ color: 'var(--c-sky-accent)', flexShrink: 0 }} />
+                              <span className="popover-row-label">Doc/ID</span>
+                              <span className="popover-row-value" style={{ fontFamily: 'monospace' }}>
+                                {student.documentId || '—'}
+                              </span>
+                            </div>
+                            <div className="popover-row">
+                              <Phone size={14} style={{ color: 'var(--c-sky-accent)', flexShrink: 0 }} />
+                              <span className="popover-row-label">Teléfono</span>
+                              <span className="popover-row-value">
+                                {student.phone ? (
+                                  <a 
+                                    href={`https://wa.me/${student.phone.replace(/[^0-9]/g, '')}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: '#34d399', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                    title="Enviar WhatsApp"
+                                  >
+                                    <MessageCircle size={12} /> {student.phone}
+                                  </a>
+                                ) : '—'}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <span className="badge badge-level">
                         <BookOpen size={12} /> {level?.name.split('-')[0].trim() || 'Sin Nivel'}
                       </span>
-                    </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      {student.phone ? (
-                        <a 
-                          href={`https://wa.me/${student.phone.replace(/[^0-9]/g, '')}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ color: '#34d399', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                          title="Enviar WhatsApp"
-                        >
-                          <Phone size={13} /> {student.phone}
-                        </a>
-                      ) : (
-                        <span style={{ color: 'var(--text-faint)' }}>—</span>
-                      )}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <span style={{ fontFamily: 'monospace', color: '#a5b4fc', background: 'rgba(99, 102, 241, 0.1)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.82rem' }}>
@@ -215,10 +280,8 @@ export default function StudentsManager({ data }) {
                         {presents} clases
                       </span>
                     </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <span className={`badge ${student.status === 'active' ? 'badge-present' : 'badge-warning'}`}>
-                        {student.status === 'active' ? 'Activo' : student.status === 'graduated' ? 'Graduado' : 'Inactivo'}
-                      </span>
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      {renderStatusIcon(student.status)}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', gap: '6px' }}>
@@ -243,7 +306,7 @@ export default function StudentsManager({ data }) {
               })
             ) : (
               <tr>
-                <td colSpan="7" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <td colSpan="6" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
                   No se encontraron estudiantes con los filtros aplicados.
                 </td>
               </tr>

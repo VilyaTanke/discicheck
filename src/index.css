@@ -623,6 +623,113 @@ h1, h2, h3, h4, h5, h6 {
   border-color: var(--border-card-hover);
 }
 
+/* Student Name Popover (click-to-reveal phone & document) */
+.student-name-cell {
+  position: relative;
+  cursor: pointer;
+}
+
+.student-name-link {
+  font-weight: 700;
+  color: var(--text-main);
+  text-decoration: none;
+  border-bottom: 1.5px dashed var(--c-sky-medium);
+  transition: all 0.2s ease;
+  display: inline-block;
+}
+
+.student-name-link:hover {
+  color: var(--c-sky-accent);
+  border-bottom-color: var(--c-sky-accent);
+}
+
+.student-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 50;
+  background: #FFFFFF;
+  border: 1.5px solid var(--border-card);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: 14px 18px;
+  min-width: 240px;
+  animation: scaleUp 0.15s ease;
+}
+
+.student-popover::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 20px;
+  width: 12px;
+  height: 12px;
+  background: #FFFFFF;
+  border-left: 1.5px solid var(--border-card);
+  border-top: 1.5px solid var(--border-card);
+  transform: rotate(45deg);
+}
+
+.popover-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 0.85rem;
+  color: var(--text-main);
+}
+
+.popover-row + .popover-row {
+  border-top: 1px solid var(--c-sky-lightest);
+}
+
+.popover-row-label {
+  font-weight: 700;
+  color: var(--text-muted);
+  min-width: 72px;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.popover-row-value {
+  font-family: 'Inter', sans-serif;
+  color: var(--text-main);
+}
+
+/* Status Icon Badges */
+.status-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  transition: transform 0.15s ease;
+}
+
+.status-icon:hover {
+  transform: scale(1.12);
+}
+
+.status-icon--active {
+  background: var(--success-bg);
+  color: var(--success);
+  border: 1.5px solid rgba(16, 185, 129, 0.3);
+}
+
+.status-icon--inactive {
+  background: var(--warning-bg);
+  color: var(--warning);
+  border: 1.5px solid rgba(245, 158, 11, 0.3);
+}
+
+.status-icon--graduated {
+  background: #EDE9FE;
+  color: #7C3AED;
+  border: 1.5px solid rgba(124, 58, 237, 0.25);
+}
+
 /* Animations */
 @keyframes fadeIn {
   from { opacity: 0; }
