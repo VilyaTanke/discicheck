@@ -73,64 +73,66 @@ export default function App() {
   };
 
   return (
-    <div>
-      {/* Barra Superior / Header */}
-      <header className="app-header">
-        <div className="brand-wrapper">
-          <div className="brand-logo-icon">
-            <BookOpen size={22} />
+    <div style={{ padding: '10px 0' }}>
+      <div className="app-container">
+        {/* Barra Superior estilo Maqueta con Botones Pastilla */}
+        <header className="mockup-navbar">
+          <div className="mockup-brand">
+            <div className="mockup-brand-icon">
+              <BookOpen size={22} />
+            </div>
+            <div>
+              <h1 className="mockup-brand-title">Discipulado</h1>
+              <span className="mockup-brand-sub">Control de Asistencia</span>
+            </div>
           </div>
-          <div>
-            <h1 className="brand-title">Discipulado</h1>
-            <span className="brand-subtitle">Control de Asistencia</span>
-          </div>
-        </div>
 
-        {/* Selector de Modo: Fichaje Móvil / Panel Admin */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <nav className="nav-switcher">
+          {/* Grupo de Pastillas de Navegación */}
+          <div className="nav-pills-group">
             <button
               type="button"
-              className={`nav-tab-btn ${viewMode === 'checkin' ? 'active' : ''}`}
+              className={`nav-pill ${viewMode === 'checkin' ? 'active' : ''}`}
               onClick={() => setViewMode('checkin')}
             >
               <Smartphone size={16} />
-              <span>Fichaje Alumno</span>
+              <span>Fichaje</span>
             </button>
 
             <button
               type="button"
-              className={`nav-tab-btn ${viewMode === 'admin' ? 'active' : ''}`}
+              className={`nav-pill ${viewMode === 'admin' ? 'active' : 'nav-pill-warm'}`}
               onClick={handleOpenAdmin}
             >
               <Shield size={16} />
               <span>Panel Admin</span>
             </button>
-          </nav>
 
-          {/* Botón de Cerrar Sesión si está autenticado */}
-          {isAdminUnlocked && viewMode === 'admin' && (
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              onClick={handleLogout}
-              title="Cerrar Sesión de Administrador"
-              style={{ borderColor: 'rgba(239, 68, 68, 0.4)', color: '#f87171' }}
-            >
-              <Lock size={14} /> Salir
-            </button>
+            {/* Botón de Cerrar Sesión si está autenticado en admin */}
+            {isAdminUnlocked && viewMode === 'admin' && (
+              <button
+                type="button"
+                className="nav-pill"
+                onClick={handleLogout}
+                title="Cerrar Sesión de Administrador"
+                style={{ background: '#FEECEB', color: '#991B1B' }}
+              >
+                <Lock size={14} /> Salir
+              </button>
+            )}
+          </div>
+        </header>
+
+        {/* Contenido Principal */}
+        <main>
+          {viewMode === 'checkin' ? (
+            <StudentCheckIn data={data} />
+          ) : (
+            <div style={{ padding: '10px 32px 40px' }}>
+              <AdminPanel data={data} onLogout={handleLogout} />
+            </div>
           )}
-        </div>
-      </header>
-
-      {/* Contenido Principal */}
-      <main className="main-content">
-        {viewMode === 'checkin' ? (
-          <StudentCheckIn data={data} />
-        ) : (
-          <AdminPanel data={data} onLogout={handleLogout} />
-        )}
-      </main>
+        </main>
+      </div>
 
       {/* Modal de Acceso de Administrador con Usuario y Contraseña */}
       {showLoginModal && (
@@ -223,13 +225,13 @@ export default function App() {
               )}
 
               <div style={{
-                background: 'rgba(15, 23, 42, 0.6)',
+                background: 'var(--c-sky-lightest)',
                 borderRadius: 'var(--radius-sm)',
-                padding: '10px 12px',
-                fontSize: '0.78rem',
-                color: 'var(--text-muted)',
-                marginBottom: '16px',
-                border: '1px solid var(--border-card)'
+                padding: '10px 14px',
+                fontSize: '0.8rem',
+                color: '#2B4A6F',
+                marginBottom: '18px',
+                border: '1.5px solid var(--border-card)'
               }}>
                 🔑 <strong>Credenciales por defecto:</strong><br />
                 Usuario: <code>admin</code> • Contraseña: <code>password123</code>

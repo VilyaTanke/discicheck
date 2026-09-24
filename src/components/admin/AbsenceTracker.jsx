@@ -248,7 +248,7 @@ export default function AbsenceTracker({ data }) {
       <div className="glass-panel" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid var(--border-card)', background: 'rgba(15, 23, 42, 0.5)', color: 'var(--text-muted)' }}>
+            <tr style={{ borderBottom: '1.5px solid var(--border-card)', background: 'var(--c-sky-lightest)', color: '#1A365D' }}>
               <th style={{ padding: '12px 16px' }}>Estudiante</th>
               <th style={{ padding: '12px 16px' }}>Estado para {selectedDate}</th>
               <th style={{ padding: '12px 16px' }}>Hora Fichaje</th>
@@ -269,12 +269,12 @@ export default function AbsenceTracker({ data }) {
                     key={student.id} 
                     style={{ 
                       borderBottom: '1px solid var(--border-card)',
-                      background: !isPresent && totalConsecutive >= 2 ? 'rgba(239, 68, 68, 0.05)' : 'transparent',
+                      background: !isPresent && totalConsecutive >= 2 ? '#FEF2F2' : 'transparent',
                       transition: 'background 0.15s ease'
                     }}
                   >
                     <td style={{ padding: '12px 16px' }}>
-                      <div style={{ fontWeight: '600', color: 'white' }}>{student.name}</div>
+                      <div style={{ fontWeight: '700', color: 'var(--text-main)' }}>{student.name}</div>
                       <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                         ID: {student.documentId || '—'} {student.phone && `• ${student.phone}`}
                       </div>

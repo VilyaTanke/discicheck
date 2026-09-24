@@ -30,14 +30,14 @@ export default function AdminPanel({ data }) {
 
   return (
     <div>
-      {/* Subnavegación del Panel Admin */}
+      {/* Subnavegación del Panel Admin en Pastillas */}
       <div style={{
         display: 'flex',
-        gap: '6px',
+        gap: '8px',
         overflowX: 'auto',
-        paddingBottom: '12px',
-        marginBottom: '20px',
-        borderBottom: '1px solid var(--border-card)',
+        paddingBottom: '16px',
+        marginBottom: '24px',
+        borderBottom: '1.5px solid var(--border-card)',
         scrollbarWidth: 'none',
       }}>
         {tabs.map(tab => {
@@ -47,12 +47,15 @@ export default function AdminPanel({ data }) {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`btn ${isActive ? 'btn-primary' : 'btn-outline'}`}
+              className={`nav-pill ${isActive ? 'active' : ''}`}
               style={{
-                fontSize: '0.85rem',
-                padding: '8px 14px',
+                fontSize: '0.88rem',
+                padding: '8px 18px',
                 whiteSpace: 'nowrap',
-                borderRadius: 'var(--radius-full)'
+                background: isActive ? 'var(--c-sky-accent)' : 'var(--c-sky-lightest)',
+                color: isActive ? '#1A365D' : 'var(--text-main)',
+                border: '1.5px solid var(--border-card)',
+                boxShadow: isActive ? '0 4px 12px rgba(127, 183, 230, 0.35)' : 'none'
               }}
             >
               <Icon size={16} />

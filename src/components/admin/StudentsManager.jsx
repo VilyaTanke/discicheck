@@ -152,7 +152,7 @@ export default function StudentsManager({ data }) {
       <div className="glass-panel" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid var(--border-card)', background: 'rgba(15, 23, 42, 0.5)', color: 'var(--text-muted)' }}>
+            <tr style={{ borderBottom: '1.5px solid var(--border-card)', background: 'var(--c-sky-lightest)', color: '#1A365D' }}>
               <th style={{ padding: '12px 16px' }}>Estudiante</th>
               <th style={{ padding: '12px 16px' }}>Documento / ID</th>
               <th style={{ padding: '12px 16px' }}>Nivel Asignado</th>
@@ -173,11 +173,11 @@ export default function StudentsManager({ data }) {
                   <tr 
                     key={student.id} 
                     style={{ borderBottom: '1px solid var(--border-card)', transition: 'background 0.15s ease' }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)'}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--c-sky-lightest)'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                   >
                     <td style={{ padding: '12px 16px' }}>
-                      <div style={{ fontWeight: '600', color: 'white' }}>{student.name}</div>
+                      <div style={{ fontWeight: '700', color: 'var(--text-main)' }}>{student.name}</div>
                       {student.notes && (
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-faint)' }}>{student.notes}</div>
                       )}
