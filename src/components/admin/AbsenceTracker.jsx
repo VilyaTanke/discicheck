@@ -16,6 +16,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
+import { exportExcelReport } from '../../services/excelExportService';
 
 export default function AbsenceTracker({ data }) {
   const { levels = [], students = [], attendance = [], teachers = [] } = data;
@@ -154,8 +155,8 @@ export default function AbsenceTracker({ data }) {
 
           <button 
             className="btn btn-outline btn-sm"
-            onClick={() => storageService.exportCSV(selectedLevelId)}
-            title="Descargar historial de este nivel en Excel/CSV"
+            onClick={() => exportExcelReport(selectedLevelId)}
+            title="Descargar historial de este nivel en Excel (.xlsx)"
           >
             <Download size={15} /> Exportar Excel
           </button>

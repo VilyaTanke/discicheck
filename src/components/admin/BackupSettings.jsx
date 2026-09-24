@@ -1,5 +1,5 @@
 // src/components/admin/BackupSettings.jsx
-// Respaldos, Exportación a Excel/JSON y Configuración de Datos para GitHub Pages
+// Respaldos, Exportación a Excel/JSON, Datos de la Iglesia y Configuración
 
 import React, { useState } from 'react';
 import { 
@@ -14,15 +14,34 @@ import {
   ExternalLink,
   Lock,
   Key,
-  Check
+  Check,
+  Church,
+  MapPin,
+  Phone,
+  User
 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
+import { exportExcelReport } from '../../services/excelExportService';
 
 export default function BackupSettings({ data }) {
   const [importStatus, setImportStatus] = useState(null);
   const [newAdminUser, setNewAdminUser] = useState(data.settings?.adminUser || 'admin');
   const [newAdminPass, setNewAdminPass] = useState('');
   const [credStatus, setCredStatus] = useState(null);
+
+  // Datos de la iglesia
+  const [churchName, setChurchName] = useState(data.settings?.churchName || '');
+  const [churchAddress, setChurchAddress] = useState(data.settings?.churchAddress || '');
+  const [churchPhone, setChurchPhone] = useState(data.settings?.churchPhone || '');
+  const [churchPastor, setChurchPastor] = useState(data.settings?.churchPastor || '');
+  const [churchStatus, setChurchStatus] = useState(null);
+
+  const handleSaveChurchInfo = (e) => {
+    e.preventDefault();
+    storageService.updateChurchInfo({ churchName, churchAddress, churchPhone, churchPastor });
+    setChurchStatus({ type: 'success', text: '¡Datos de la iglesia guardados correctamente!' });
+    setTimeout(() => setChurchStatus(null), 4000);
+  };
 
   const handleUpdateCreds = (e) => {
     e.preventDefault();
@@ -39,8 +58,8 @@ export default function BackupSettings({ data }) {
     storageService.exportJSON();
   };
 
-  const handleExportCSV = () => {
-    storageService.exportCSV();
+  const handleExportExcel = () => {
+    exportExcelReport();
   };
 
   const handleFileImport = (e) => {
@@ -67,6 +86,23 @@ export default function BackupSettings({ data }) {
     }
   };
 
+  const StatusBanner = ({ status }) => {
+    if (!status) return null;
+    return (
+      <div style={{
+        padding: '10px 14px',
+        borderRadius: 'var(--radius-sm)',
+        marginBottom: '14px',
+        background: status.type === 'success' ? 'var(--success-bg)' : 'var(--danger-bg)',
+        color: status.type === 'success' ? 'var(--success-text)' : 'var(--danger-text)',
+        fontSize: '0.85rem',
+        border: `1px solid ${status.type === 'success' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+      }}>
+        {status.text}
+      </div>
+    );
+  };
+
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
       <div style={{ marginBottom: '20px' }}>
@@ -76,31 +112,92 @@ export default function BackupSettings({ data }) {
         </p>
       </div>
 
-      {importStatus && (
-        <div style={{
-          padding: '14px 16px',
-          borderRadius: 'var(--radius-md)',
-          marginBottom: '16px',
-          background: importStatus.type === 'success' ? 'var(--success-light)' : 'var(--danger-light)',
-          color: importStatus.type === 'success' ? '#34d399' : '#f87171',
-          border: `1px solid ${importStatus.type === 'success' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
-        }}>
-          {importStatus.text}
-        </div>
-      )}
+      <StatusBanner status={importStatus} />
 
-      {/* Tarjeta de Exportación */}
+      {/* ═══ Datos de la Iglesia ═══ */}
+      <div className="glass-panel" style={{ padding: '20px', marginBottom: '20px', border: '1.5px solid var(--c-sky-soft)' }}>
+        <h4 style={{ fontSize: '1.1rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Church size={18} color="var(--c-sky-accent)" /> Datos de la Iglesia
+        </h4>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '16px' }}>
+          Estos datos aparecerán en el encabezado de los reportes Excel exportados.
+        </p>
+
+        <StatusBanner status={churchStatus} />
+
+        <form onSubmit={handleSaveChurchInfo}>
+          <div className="form-group">
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Church size={14} /> Nombre de la Iglesia
+            </label>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="Ej. Iglesia Cristiana Vida Nueva"
+              value={churchName}
+              onChange={(e) => setChurchName(e.target.value)}
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="form-group">
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <MapPin size={14} /> Ubicación / Dirección
+              </label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Ej. C/ Gran Vía 45, Madrid, España"
+                value={churchAddress}
+                onChange={(e) => setChurchAddress(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Phone size={14} /> Teléfono de Contacto
+              </label>
+              <input
+                type="tel"
+                className="form-input"
+                placeholder="+34 600 000 000"
+                value={churchPhone}
+                onChange={(e) => setChurchPhone(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <User size={14} /> Pastor Principal
+            </label>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="Ej. Pastor Juan Pérez"
+              value={churchPastor}
+              onChange={(e) => setChurchPastor(e.target.value)}
+            />
+          </div>
+
+          <button type="submit" className="btn btn-primary" style={{ marginTop: '4px' }}>
+            <Check size={16} /> Guardar Datos de la Iglesia
+          </button>
+        </form>
+      </div>
+
+      {/* ═══ Exportación ═══ */}
       <div className="glass-panel" style={{ padding: '20px', marginBottom: '20px' }}>
         <h4 style={{ fontSize: '1.1rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Download size={18} color="#818cf8" /> Exportar Datos y Reportes
         </h4>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '16px' }}>
-          Descarga un archivo con toda la información de estudiantes, niveles y asistencias para archivar o abrir en Excel.
+          Descarga un archivo Excel (.xlsx) profesional con encabezado de la iglesia, resumen por nivel, listado de estudiantes y registros detallados de asistencia.
         </p>
 
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          <button className="btn btn-primary" onClick={handleExportCSV}>
-            <FileSpreadsheet size={16} /> Descargar Reporte Completo (Excel / CSV)
+          <button className="btn btn-primary" onClick={handleExportExcel}>
+            <FileSpreadsheet size={16} /> Descargar Reporte Completo (.xlsx)
           </button>
           <button className="btn btn-outline" onClick={handleExportJSON}>
             <Database size={16} /> Guardar Copia de Seguridad (.json)
@@ -108,7 +205,7 @@ export default function BackupSettings({ data }) {
         </div>
       </div>
 
-      {/* Tarjeta de Restauración / Importación */}
+      {/* ═══ Restauración ═══ */}
       <div className="glass-panel" style={{ padding: '20px', marginBottom: '20px' }}>
         <h4 style={{ fontSize: '1.1rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Upload size={18} color="#34d399" /> Restaurar Copia de Seguridad
@@ -128,7 +225,7 @@ export default function BackupSettings({ data }) {
         </label>
       </div>
 
-      {/* Información sobre el Servidor Gratuito GitHub Pages */}
+      {/* ═══ Info GitHub Pages ═══ */}
       <div className="glass-panel" style={{
         padding: '20px',
         marginBottom: '20px',
@@ -151,7 +248,7 @@ export default function BackupSettings({ data }) {
         </div>
       </div>
 
-      {/* Seguridad y Cambio de Credenciales de Administrador */}
+      {/* ═══ Seguridad Admin ═══ */}
       <div className="glass-panel" style={{ padding: '20px', marginBottom: '20px', border: '1px solid rgba(99, 102, 241, 0.25)' }}>
         <h4 style={{ fontSize: '1.1rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px', color: '#a5b4fc' }}>
           <Key size={18} /> Seguridad: Usuario y Contraseña de Administrador
@@ -160,19 +257,7 @@ export default function BackupSettings({ data }) {
           Cambia el usuario o la contraseña para restringir el acceso a este panel solo a la persona autorizada.
         </p>
 
-        {credStatus && (
-          <div style={{
-            padding: '10px 14px',
-            borderRadius: 'var(--radius-sm)',
-            marginBottom: '14px',
-            background: credStatus.type === 'success' ? 'var(--success-light)' : 'var(--danger-light)',
-            color: credStatus.type === 'success' ? '#34d399' : '#f87171',
-            fontSize: '0.85rem',
-            border: `1px solid ${credStatus.type === 'success' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
-          }}>
-            {credStatus.text}
-          </div>
-        )}
+        <StatusBanner status={credStatus} />
 
         <form onSubmit={handleUpdateCreds} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', alignItems: 'flex-end' }}>
           <div className="form-group" style={{ margin: 0 }}>
@@ -207,7 +292,7 @@ export default function BackupSettings({ data }) {
         </form>
       </div>
 
-      {/* Restablecer Datos de Demostración */}
+      {/* ═══ Zona de Mantenimiento ═══ */}
       <div className="glass-panel" style={{ padding: '20px', borderColor: 'rgba(239, 68, 68, 0.2)' }}>
         <h4 style={{ fontSize: '1.1rem', marginBottom: '8px', color: '#f87171', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <AlertTriangle size={18} /> Zona de Mantenimiento

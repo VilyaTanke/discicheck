@@ -502,5 +502,17 @@ export const storageService = {
     if (newPassword) data.settings.adminPassword = newPassword;
     this.saveData(data);
     return { success: true };
+  },
+
+  // Actualizar datos de la iglesia
+  updateChurchInfo({ churchName, churchAddress, churchPhone, churchPastor }) {
+    const data = this.getData();
+    if (!data.settings) data.settings = {};
+    data.settings.churchName = churchName || '';
+    data.settings.churchAddress = churchAddress || '';
+    data.settings.churchPhone = churchPhone || '';
+    data.settings.churchPastor = churchPastor || '';
+    this.saveData(data);
+    return { success: true };
   }
 };
