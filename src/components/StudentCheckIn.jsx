@@ -15,7 +15,6 @@ import {
   AlertTriangle, 
   RotateCcw, 
   BookOpen, 
-  Info,
   Sprout,
   Heart,
   Flame,
@@ -62,11 +61,6 @@ export default function StudentCheckIn({ data }) {
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     return new Date().toLocaleDateString('es-ES', options);
   }, []);
-
-  // Alumnos de ejemplo de este nivel para ayudar a probar en modo demo
-  const sampleLevelStudents = useMemo(() => {
-    return students.filter(s => s.levelId === selectedLevelId && s.status === 'active').slice(0, 4);
-  }, [students, selectedLevelId]);
 
   // Icono para cada nivel inspirado en la maqueta
   const getLevelIcon = (index) => {
@@ -153,14 +147,6 @@ export default function StudentCheckIn({ data }) {
     setErrorMessage('');
     setAlreadyCheckedIn(null);
     setJustCheckedIn(null);
-  };
-
-  const handleSelectSample = (samplePhone) => {
-    setPhoneInput(samplePhone);
-    setPasswordInput('1234');
-    setErrorMessage('');
-    setAlreadyCheckedIn(null);
-    scrollToForm();
   };
 
   return (
@@ -425,35 +411,6 @@ export default function StudentCheckIn({ data }) {
             </button>
           </div>
         </form>
-
-        {/* Acceso Rápido / Ayuda de Estudiantes de Demostración */}
-        {sampleLevelStudents.length > 0 && (
-          <div style={{
-            marginTop: '26px',
-            paddingTop: '18px',
-            borderTop: '1.5px dashed var(--border-card)',
-            fontSize: '0.8rem',
-            color: 'var(--text-muted)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', color: '#3A6791', fontWeight: '700' }}>
-              <Info size={15} /> Atajo para pruebas de {currentLevel?.name.split('-')[0].trim()} (Contraseña por defecto: <code>1234</code>):
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {sampleLevelStudents.map(s => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => handleSelectSample(s.phone)}
-                  className="btn btn-outline btn-sm"
-                  style={{ fontSize: '0.78rem', padding: '5px 12px', borderRadius: 'var(--radius-pill)' }}
-                  title={`Tel: ${s.phone}`}
-                >
-                  {s.name} ({s.phone})
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </section>
 
       {/* Pantalla Modal / Overlay de Éxito al Fichar */}

@@ -335,23 +335,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* Guía con profesores disponibles */}
-              <div style={{
-                background: 'rgba(16, 185, 129, 0.08)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '10px 14px',
-                fontSize: '0.8rem',
-                color: '#065F46',
-                marginBottom: '18px',
-                border: '1px solid rgba(16, 185, 129, 0.25)'
-              }}>
-                <div style={{ fontWeight: '600', marginBottom: '4px' }}>💡 Profesores de prueba disponibles:</div>
-                <div style={{ fontSize: '0.76rem', lineHeight: '1.5' }}>
-                  • <strong>Andrés Romero</strong>: <code>+34 611 223 344</code> (Clave: <code>1234</code>)<br />
-                  • <strong>Miriam Valdés</strong>: <code>+34 622 334 455</code> (Clave: <code>1234</code>)<br />
-                  • <strong>David Gómez</strong>: <code>+34 633 445 566</code> (Clave: <code>1234</code>)
-                </div>
-              </div>
 
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button
@@ -465,18 +448,6 @@ export default function App() {
                 </div>
               )}
 
-              <div style={{
-                background: 'var(--c-sky-lightest)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '10px 14px',
-                fontSize: '0.8rem',
-                color: '#2B4A6F',
-                marginBottom: '18px',
-                border: '1.5px solid var(--border-card)'
-              }}>
-                🔑 <strong>Credenciales por defecto:</strong><br />
-                Usuario: <code>admin</code> • Contraseña: <code>password123</code>
-              </div>
 
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button
