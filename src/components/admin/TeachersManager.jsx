@@ -55,7 +55,9 @@ export default function TeachersManager({ data }) {
   };
 
   const handleDelete = (teacherId, teacherName) => {
-    const assignedLevels = levels.filter(l => l.teacherId === teacherId);
+    const assignedLevels = levels.filter(l => 
+      (Array.isArray(l.teacherIds) && l.teacherIds.includes(teacherId)) || l.teacherId === teacherId
+    );
     let msg = `¿Deseas eliminar a "${teacherName}"?`;
     if (assignedLevels.length > 0) {
       msg += ` Está asignado como responsable en ${assignedLevels.length} nivel(es).`;
@@ -81,7 +83,9 @@ export default function TeachersManager({ data }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '16px' }}>
         {teachers.map(teacher => {
-          const assignedLevels = levels.filter(l => l.teacherId === teacher.id);
+          const assignedLevels = levels.filter(l => 
+            (Array.isArray(l.teacherIds) && l.teacherIds.includes(teacher.id)) || l.teacherId === teacher.id
+          );
 
           return (
             <div key={teacher.id} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>

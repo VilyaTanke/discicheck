@@ -22,8 +22,10 @@ export default function TeacherPanel({ data, currentTeacher, onLogout }) {
     { id: 'students', label: 'Estudiantes', icon: Users },
   ];
 
-  // Niveles asignados a este profesor
-  const assignedLevels = (data.levels || []).filter(l => l.teacherId === currentTeacher?.id);
+  // Niveles asignados a este profesor (soporta múltiples profesores por nivel)
+  const assignedLevels = (data.levels || []).filter(l => 
+    (Array.isArray(l.teacherIds) && l.teacherIds.includes(currentTeacher?.id)) || l.teacherId === currentTeacher?.id
+  );
 
   return (
     <div>

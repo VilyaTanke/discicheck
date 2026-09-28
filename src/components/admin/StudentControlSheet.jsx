@@ -56,9 +56,11 @@ export default function StudentControlSheet({ student, data, onBack, currentTeac
   const [editingNoteHomework, setEditingNoteHomework] = useState(null);
   const [noteFormText, setNoteFormText] = useState('');
 
-  // Nivel y profesor asignado
+  // Nivel y profesores asignados (soporta múltiples profesores)
   const level = levels.find(l => l.id === student.levelId);
-  const teacher = teachers.find(t => t.id === level?.teacherId);
+  const assignedTeachers = (teachers || []).filter(t => 
+    (Array.isArray(level?.teacherIds) && level.teacherIds.includes(t.id)) || t.id === level?.teacherId
+  );
 
   // Historial de asistencias de este estudiante
   const studentAttendance = useMemo(() => {
@@ -315,12 +317,22 @@ export default function StudentControlSheet({ student, data, onBack, currentTeac
             minWidth: '220px'
           }}>
             <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '4px' }}>
-              Profesor Encargado
+              {assignedTeachers.length > 1 ? 'Profesores Encargados' : 'Profesor Encargado'}
             </div>
-            <div style={{ fontWeight: '700', color: 'var(--text-main)', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <GraduationCap size={15} style={{ color: '#10b981' }} />
-              {teacher?.name || 'Por asignar'}
-            </div>
+            {assignedTeachers.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                {assignedTeachers.map(t => (
+                  <div key={t.id} style={{ fontWeight: '700', color: 'var(--text-main)', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <GraduationCap size={14} style={{ color: '#10b981', flexShrink: 0 }} />
+                    <span>{t.name}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontWeight: '600', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                Por asignar
+              </div>
+            )}
             {level?.dayOfWeek && (
               <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                 📅 Horario: {level.dayOfWeek} {level.time}

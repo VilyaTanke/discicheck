@@ -50,11 +50,13 @@ export default function StudentCheckIn({ data }) {
     return levels.find(l => l.id === selectedLevelId) || levels[0];
   }, [levels, selectedLevelId]);
 
-  // Profesor asignado a este nivel
-  const currentTeacher = useMemo(() => {
-    if (!currentLevel?.teacherId) return null;
-    return teachers.find(t => t.id === currentLevel.teacherId);
+  // Profesores asignados a este nivel
+  const currentTeachers = useMemo(() => {
+    return teachers.filter(t => 
+      (Array.isArray(currentLevel?.teacherIds) && currentLevel.teacherIds.includes(t.id)) || t.id === currentLevel?.teacherId
+    );
   }, [teachers, currentLevel]);
+  const currentTeacher = currentTeachers[0] || null;
 
   // Formato amigable de la fecha de hoy
   const formattedToday = useMemo(() => {
@@ -227,7 +229,9 @@ export default function StudentCheckIn({ data }) {
         <div className="levels-cards-grid">
           {levels.map((level, idx) => {
             const isSelected = selectedLevelId === level.id;
-            const teacher = teachers.find(t => t.id === level.teacherId);
+            const levelTeachers = teachers.filter(t => 
+              (Array.isArray(level.teacherIds) && level.teacherIds.includes(t.id)) || t.id === level.teacherId
+            );
 
             return (
               <div
@@ -259,9 +263,10 @@ export default function StudentCheckIn({ data }) {
                     <Clock size={13} color="#7FB7E6" />
                     <span>{level.dayOfWeek} • {level.time}</span>
                   </div>
-                  {teacher && (
+                  {levelTeachers.length > 0 && (
                     <div style={{ fontSize: '0.78rem', color: 'var(--text-faint)' }}>
-                      Prof. {teacher.name.split(' ')[0]} {teacher.name.split(' ')[1] || ''}
+                      {levelTeachers.length > 1 ? 'Profs. ' : 'Prof. '}
+                      {levelTeachers.map(t => t.name.split(' ')[0] + ' ' + (t.name.split(' ')[1] || '')).join(', ')}
                     </div>
                   )}
                 </div>

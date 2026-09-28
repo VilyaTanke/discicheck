@@ -33,9 +33,12 @@ export default function AbsenceTracker({ data }) {
     return levels.find(l => l.id === selectedLevelId) || levels[0];
   }, [levels, selectedLevelId]);
 
-  const currentTeacher = useMemo(() => {
-    return teachers.find(t => t.id === currentLevel?.teacherId);
+  const currentTeachers = useMemo(() => {
+    return teachers.filter(t => 
+      (Array.isArray(currentLevel?.teacherIds) && currentLevel.teacherIds.includes(t.id)) || t.id === currentLevel?.teacherId
+    );
   }, [teachers, currentLevel]);
+  const currentTeacher = currentTeachers[0] || null;
 
   // Estudiantes inscritos activos en este nivel
   const levelStudents = useMemo(() => {

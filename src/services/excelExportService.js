@@ -329,7 +329,10 @@ export async function exportExcelReport(filterLevelId = null) {
 
   targetStudents.forEach((student, idx) => {
     const level = levels.find(l => l.id === student.levelId);
-    const teacher = teachers.find(t => t.id === level?.teacherId);
+    const levelTeachers = teachers.filter(t => 
+      (Array.isArray(level?.teacherIds) && level.teacherIds.includes(t.id)) || t.id === level?.teacherId
+    );
+    const teacherNames = levelTeachers.map(t => t.name).join(', ') || 'Sin Asignar';
     const presents = attendance.filter(a => a.studentId === student.id && a.status === 'present').length;
 
     const statusLabel = student.status === 'active' ? '✅ Activo'
@@ -342,7 +345,7 @@ export async function exportExcelReport(filterLevelId = null) {
       // Fila de separador de nivel
       wsStudents.mergeCells(stdRow, 1, stdRow, stdColCount);
       const groupCell = wsStudents.getCell(stdRow, 1);
-      groupCell.value = `📘 ${level.name}  —  ${level.dayOfWeek || ''} ${level.time || ''}  —  ${teacher?.name || ''}`;
+      groupCell.value = `📘 ${level.name}  —  ${level.dayOfWeek || ''} ${level.time || ''}  —  ${teacherNames}`;
       groupCell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: COLORS.headerFont } };
       groupCell.alignment = { horizontal: 'left', vertical: 'middle' };
       groupCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.accentBlue } };

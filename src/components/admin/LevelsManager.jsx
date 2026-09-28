@@ -1,8 +1,5 @@
-// src/components/admin/LevelsManager.jsx
-// Gestión de Niveles de Discipulado (Nivel 1, 2, 3 y nuevos niveles)
-
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, BookOpen, Clock, MapPin, User, Check, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, BookOpen, Clock, MapPin, User, Users, Check, X } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 
 export default function LevelsManager({ data }) {
@@ -16,7 +13,7 @@ export default function LevelsManager({ data }) {
     dayOfWeek: 'Martes',
     time: '19:30 - 21:00',
     room: '',
-    teacherId: '',
+    teacherIds: [],
   });
 
   const openNewModal = () => {
@@ -27,22 +24,36 @@ export default function LevelsManager({ data }) {
       dayOfWeek: 'Martes',
       time: '19:30 - 21:00',
       room: '',
-      teacherId: teachers[0]?.id || '',
+      teacherIds: teachers[0]?.id ? [teachers[0].id] : [],
     });
     setIsModalOpen(true);
   };
 
   const openEditModal = (level) => {
     setEditingLevel(level);
+    const initialTeacherIds = Array.isArray(level.teacherIds)
+      ? level.teacherIds
+      : (level.teacherId ? [level.teacherId] : []);
+
     setFormData({
       name: level.name,
       description: level.description || '',
       dayOfWeek: level.dayOfWeek || 'Martes',
       time: level.time || '19:30 - 21:00',
       room: level.room || '',
-      teacherId: level.teacherId || '',
+      teacherIds: initialTeacherIds,
     });
     setIsModalOpen(true);
+  };
+
+  const toggleTeacherSelection = (teacherId) => {
+    setFormData(prev => {
+      const exists = prev.teacherIds.includes(teacherId);
+      const updated = exists 
+        ? prev.teacherIds.filter(id => id !== teacherId)
+        : [...prev.teacherIds, teacherId];
+      return { ...prev, teacherIds: updated };
+    });
   };
 
   const handleSave = (e) => {
@@ -52,6 +63,7 @@ export default function LevelsManager({ data }) {
     storageService.saveLevel({
       id: editingLevel ? editingLevel.id : null,
       ...formData,
+      teacherId: formData.teacherIds[0] || '',
     });
 
     setIsModalOpen(false);
@@ -85,7 +97,9 @@ export default function LevelsManager({ data }) {
       {/* Grid de Tarjetas de Niveles */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: '16px' }}>
         {levels.map(level => {
-          const teacher = teachers.find(t => t.id === level.teacherId);
+          const assignedTeachers = teachers.filter(t => 
+            (Array.isArray(level.teacherIds) && level.teacherIds.includes(t.id)) || t.id === level.teacherId
+          );
           const studentCount = students.filter(s => s.levelId === level.id).length;
 
           return (
@@ -140,9 +154,34 @@ export default function LevelsManager({ data }) {
                       <span>{level.room}</span>
                     </div>
                   )}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <User size={15} color="#f59e0b" />
-                    <span>Profesor: <strong>{teacher?.name || 'Sin profesor asignado'}</strong></span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Users size={15} color="#f59e0b" />
+                      <span>Profesores ({assignedTeachers.length}):</span>
+                    </div>
+                    {assignedTeachers.length > 0 ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', paddingLeft: '21px' }}>
+                        {assignedTeachers.map(t => (
+                          <span key={t.id} style={{
+                            background: 'rgba(245, 158, 11, 0.12)',
+                            color: '#b45309',
+                            fontSize: '0.74rem',
+                            fontWeight: '600',
+                            padding: '2px 7px',
+                            borderRadius: '4px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px'
+                          }}>
+                            <User size={10} /> {t.name}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span style={{ paddingLeft: '21px', fontStyle: 'italic', color: 'var(--text-muted)' }}>
+                        Sin profesores asignados
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -251,17 +290,78 @@ export default function LevelsManager({ data }) {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Profesor Responsable</label>
-                  <select
-                    className="form-select"
-                    value={formData.teacherId}
-                    onChange={(e) => setFormData({ ...formData, teacherId: e.target.value })}
-                  >
-                    <option value="">-- Sin asignar --</option>
-                    {teachers.map(t => (
-                      <option key={t.id} value={t.id}>{t.name} ({t.role || 'Profesor'})</option>
-                    ))}
-                  </select>
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Profesores Asignados al Nivel</span>
+                    <span style={{ fontSize: '0.78rem', color: formData.teacherIds.length > 0 ? '#059669' : 'var(--text-muted)', fontWeight: '700' }}>
+                      {formData.teacherIds.length} seleccionado(s)
+                    </span>
+                  </label>
+
+                  <div style={{
+                    maxHeight: '190px',
+                    overflowY: 'auto',
+                    border: '1.5px solid var(--border-card)',
+                    borderRadius: '10px',
+                    padding: '6px',
+                    background: '#FFFFFF',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px'
+                  }}>
+                    {teachers.length === 0 ? (
+                      <div style={{ padding: '12px', fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                        No hay profesores registrados en el sistema.
+                      </div>
+                    ) : (
+                      teachers.map(t => {
+                        const isSelected = formData.teacherIds.includes(t.id);
+                        return (
+                          <div
+                            key={t.id}
+                            onClick={() => toggleTeacherSelection(t.id)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '8px 12px',
+                              borderRadius: '8px',
+                              background: isSelected ? 'rgba(37, 99, 235, 0.08)' : 'transparent',
+                              border: isSelected ? '1.5px solid #93c5fd' : '1px solid transparent',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => {}} // handled by parent div onClick
+                                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                              />
+                              <div>
+                                <div style={{ fontSize: '0.88rem', fontWeight: isSelected ? '700' : '500', color: 'var(--text-main)' }}>
+                                  {t.name}
+                                </div>
+                                {t.role && (
+                                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                    {t.role}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            {t.phone && (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-faint)' }}>
+                                {t.phone}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                  <p style={{ margin: '6px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    Puedes asignar varios profesores para que todos compartan la administración y los fichajes de este nivel.
+                  </p>
                 </div>
               </div>
 

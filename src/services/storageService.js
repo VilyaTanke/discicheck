@@ -23,6 +23,7 @@ export const INITIAL_DATA = {
       time: '19:30 - 21:00',
       room: 'Aula 1 - Planta Baja',
       teacherId: 'tch-1',
+      teacherIds: ['tch-1'],
       isActive: true,
       color: '#3b82f6', // blue
     },
@@ -34,6 +35,7 @@ export const INITIAL_DATA = {
       time: '19:30 - 21:00',
       room: 'Aula 2 - Primer Piso',
       teacherId: 'tch-2',
+      teacherIds: ['tch-2'],
       isActive: true,
       color: '#10b981', // emerald
     },
@@ -45,6 +47,7 @@ export const INITIAL_DATA = {
       time: '17:00 - 18:45',
       room: 'Auditorio Principal',
       teacherId: 'tch-3',
+      teacherIds: ['tch-3'],
       isActive: true,
       color: '#8b5cf6', // purple
     },
@@ -249,6 +252,12 @@ export const storageService = {
           parsed.teachers = parsed.teachers.map(t => ({
             ...t,
             password: t.password || '0000'
+          }));
+        }
+        if (parsed.levels) {
+          parsed.levels = parsed.levels.map(l => ({
+            ...l,
+            teacherIds: Array.isArray(l.teacherIds) ? l.teacherIds : (l.teacherId ? [l.teacherId] : [])
           }));
         }
         if (!parsed.homework) {
@@ -508,12 +517,22 @@ export const storageService = {
   // Gestión de Niveles
   saveLevel(level) {
     const data = this.getData();
-    if (level.id) {
-      const idx = data.levels.findIndex(l => l.id === level.id);
-      if (idx >= 0) data.levels[idx] = { ...data.levels[idx], ...level };
+    const teacherIds = Array.isArray(level.teacherIds)
+      ? level.teacherIds
+      : (level.teacherId ? [level.teacherId] : []);
+    
+    const formattedLevel = {
+      ...level,
+      teacherIds,
+      teacherId: teacherIds[0] || level.teacherId || '',
+    };
+
+    if (formattedLevel.id) {
+      const idx = data.levels.findIndex(l => l.id === formattedLevel.id);
+      if (idx >= 0) data.levels[idx] = { ...data.levels[idx], ...formattedLevel };
     } else {
       const newLevel = {
-        ...level,
+        ...formattedLevel,
         id: `lvl-${Date.now()}`,
         isActive: true,
       };
@@ -563,6 +582,20 @@ export const storageService = {
     const data = this.getData();
     const teacherToDelete = data.teachers.find(t => t.id === teacherId);
     data.teachers = data.teachers.filter(t => t.id !== teacherId);
+    
+    // Desvincular profesor de los niveles donde estaba asignado
+    if (data.levels) {
+      data.levels = data.levels.map(lvl => {
+        const currentIds = Array.isArray(lvl.teacherIds) ? lvl.teacherIds : (lvl.teacherId ? [lvl.teacherId] : []);
+        const updatedIds = currentIds.filter(id => id !== teacherId);
+        return {
+          ...lvl,
+          teacherIds: updatedIds,
+          teacherId: lvl.teacherId === teacherId ? (updatedIds[0] || '') : lvl.teacherId,
+        };
+      });
+    }
+
     this.saveData(data);
 
     // Eliminar credencial de Firebase
