@@ -4,7 +4,7 @@
 // o configuradas directamente desde la pestaña de administración.
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { getFirestore, initializeFirestore } from 'firebase/firestore';
 
 const FIREBASE_CONFIG_STORAGE_KEY = 'discipulado_firebase_config_v1';
 
@@ -16,7 +16,6 @@ export const DEFAULT_FIREBASE_CONFIG = {
   storageBucket: "discipcheck.firebasestorage.app",
   messagingSenderId: "79080930092",
   appId: "1:79080930092:web:bed606509119e2de804a89",
-  measurementId: "G-M3S641P1Y1"
 };
 
 // Obtener credenciales desde localStorage, variables de entorno o configuración predeterminada
@@ -84,7 +83,14 @@ export function initFirebase() {
     } else {
       firebaseApp = getApp();
     }
-    firestoreDb = getFirestore(firebaseApp);
+    try {
+      firestoreDb = initializeFirestore(firebaseApp, {
+        experimentalAutoDetectLongPolling: true,
+        ignoreUndefinedProperties: true,
+      });
+    } catch {
+      firestoreDb = getFirestore(firebaseApp);
+    }
     return firestoreDb;
   } catch (err) {
     console.error('Error al inicializar Firebase:', err);

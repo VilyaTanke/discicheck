@@ -164,7 +164,15 @@ export default function BackupSettings({ data }) {
       await storageService.pushLocalDataToFirestore();
       setFbStatus({ type: 'success', text: '¡Datos locales subidos y sincronizados en la nube de Firebase!' });
     } catch (err) {
-      setFbStatus({ type: 'error', text: `Error al subir: ${err.message}` });
+      const msg = err.message || '';
+      if (msg.includes('PERMISSION_DENIED') || msg.includes('permission-denied') || msg.includes('not been used in project')) {
+        setFbStatus({ 
+          type: 'error', 
+          text: 'Firebase rechazó la conexión (PERMISSION_DENIED): Cloud Firestore aún no ha sido habilitado en tu proyecto Firebase "discipcheck". Ve a https://console.firebase.google.com/project/discipcheck/firestore y pulsa en "Crear base de datos" en Modo de prueba.' 
+        });
+      } else {
+        setFbStatus({ type: 'error', text: `Error al subir: ${msg}` });
+      }
     } finally {
       setIsSyncing(false);
     }
