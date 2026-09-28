@@ -15,7 +15,7 @@ export default function TeachersManager({ data }) {
     phone: '',
     email: '',
     role: '',
-    password: '1234',
+    password: '0000',
   });
 
   const openNewModal = () => {
@@ -25,7 +25,7 @@ export default function TeachersManager({ data }) {
       phone: '',
       email: '',
       role: 'Profesor de Discipulado',
-      password: '1234',
+      password: '0000',
     });
     setIsModalOpen(true);
   };
@@ -37,7 +37,7 @@ export default function TeachersManager({ data }) {
       phone: teacher.phone || '',
       email: teacher.email || '',
       role: teacher.role || '',
-      password: teacher.password || '1234',
+      password: teacher.password || '0000',
     });
     setIsModalOpen(true);
   };
@@ -148,7 +148,7 @@ export default function TeachersManager({ data }) {
                   )}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: 'var(--text-faint)' }}>
                     <Key size={13} color="#f59e0b" />
-                    <span>Clave de acceso: <strong style={{ color: 'var(--text-main)', fontFamily: 'monospace' }}>{teacher.password || '1234'}</strong></span>
+                    <span>Clave de acceso: <strong style={{ color: 'var(--text-main)', fontFamily: 'monospace' }}>{teacher.password || '0000'}</strong></span>
                   </div>
                 </div>
               </div>
@@ -251,7 +251,7 @@ export default function TeachersManager({ data }) {
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="1234"
+                    placeholder="0000"
                     required
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}

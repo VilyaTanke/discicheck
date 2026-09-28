@@ -22,7 +22,7 @@ export default function StudentsManager({ data }) {
     name: '',
     documentId: '',
     phone: '',
-    password: '1234',
+    password: '0000',
     levelId: '',
     status: 'active',
     notes: '',
@@ -65,7 +65,7 @@ export default function StudentsManager({ data }) {
       name: '',
       documentId: '',
       phone: '',
-      password: '1234',
+      password: '0000',
       levelId: levels[0]?.id || '',
       status: 'active',
       notes: '',
@@ -79,7 +79,7 @@ export default function StudentsManager({ data }) {
       name: student.name,
       documentId: student.documentId || '',
       phone: student.phone || '',
-      password: student.password || '1234',
+      password: student.password || '0000',
       levelId: student.levelId || levels[0]?.id || '',
       status: student.status || 'active',
       notes: student.notes || '',
@@ -272,7 +272,7 @@ export default function StudentsManager({ data }) {
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <span style={{ fontFamily: 'monospace', color: '#a5b4fc', background: 'rgba(99, 102, 241, 0.1)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.82rem' }}>
-                        {student.password || '1234'}
+                        {student.password || '0000'}
                       </span>
                     </td>
                     <td style={{ padding: '12px 16px' }}>
@@ -377,7 +377,7 @@ export default function StudentsManager({ data }) {
                       type="text"
                       className="form-input"
                       required
-                      placeholder="1234"
+                      placeholder="0000"
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     />

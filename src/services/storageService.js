@@ -2,12 +2,13 @@
 // Servicio de datos y persistencia para Control de Asistencia Discipulado
 // Soporta modo Offline (localStorage) y Sincronización en Tiempo Real con Firebase Cloud Firestore
 
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { getDb, isFirebaseConfigured, initFirebase } from './firebase';
 
 const STORAGE_KEY = 'discipulado_attendance_data_v1';
 const FIRESTORE_COLLECTION = 'discipulado';
 const FIRESTORE_DOC = 'database';
+const FIRESTORE_CREDENTIALS_COLLECTION = 'credentials';
 
 let unsubscribeFirestore = null;
 
@@ -55,7 +56,7 @@ export const INITIAL_DATA = {
       phone: '+34 611 223 344',
       email: 'andres.romero@iglesia.org',
       role: 'Coordinador Nivel 1',
-      password: '1234',
+      password: '0000',
     },
     {
       id: 'tch-2',
@@ -63,7 +64,7 @@ export const INITIAL_DATA = {
       phone: '+34 622 334 455',
       email: 'miriam.valdes@iglesia.org',
       role: 'Coordinadora Nivel 2',
-      password: '1234',
+      password: '0000',
     },
     {
       id: 'tch-3',
@@ -71,7 +72,7 @@ export const INITIAL_DATA = {
       phone: '+34 633 445 566',
       email: 'david.gomez@iglesia.org',
       role: 'Coordinador Nivel 3',
-      password: '1234',
+      password: '0000',
     },
   ],
   students: [
@@ -81,7 +82,7 @@ export const INITIAL_DATA = {
       name: 'Carlos Mendoza',
       documentId: '1001',
       phone: '+34600111222',
-      password: '1234',
+      password: '0000',
       levelId: 'lvl-1',
       status: 'active',
       enrolledAt: '2026-09-01',
@@ -92,7 +93,7 @@ export const INITIAL_DATA = {
       name: 'Lucía Fernández',
       documentId: '1002',
       phone: '+34600222333',
-      password: '1234',
+      password: '0000',
       levelId: 'lvl-1',
       status: 'active',
       enrolledAt: '2026-09-01',
@@ -103,7 +104,7 @@ export const INITIAL_DATA = {
       name: 'Javier Morales',
       documentId: '1003',
       phone: '+34600333444',
-      password: '1234',
+      password: '0000',
       levelId: 'lvl-1',
       status: 'active',
       enrolledAt: '2026-09-01',
@@ -114,7 +115,7 @@ export const INITIAL_DATA = {
       name: 'Ana Sofía Castillo',
       documentId: '1004',
       phone: '+34600444555',
-      password: '1234',
+      password: '0000',
       levelId: 'lvl-1',
       status: 'active',
       enrolledAt: '2026-09-01',
@@ -126,7 +127,7 @@ export const INITIAL_DATA = {
       name: 'Mateo Benítez',
       documentId: '2001',
       phone: '+34611111222',
-      password: '1234',
+      password: '0000',
       levelId: 'lvl-2',
       status: 'active',
       enrolledAt: '2026-08-15',
@@ -137,7 +138,7 @@ export const INITIAL_DATA = {
       name: 'Valentina Restrepo',
       documentId: '2002',
       phone: '+34611222333',
-      password: '1234',
+      password: '0000',
       levelId: 'lvl-2',
       status: 'active',
       enrolledAt: '2026-08-15',
@@ -148,7 +149,7 @@ export const INITIAL_DATA = {
       name: 'Gabriel Quintana',
       documentId: '2003',
       phone: '+34611333444',
-      password: '1234',
+      password: '0000',
       levelId: 'lvl-2',
       status: 'active',
       enrolledAt: '2026-08-15',
@@ -160,7 +161,7 @@ export const INITIAL_DATA = {
       name: 'Daniela Salgado',
       documentId: '3001',
       phone: '+34622111222',
-      password: '1234',
+      password: '0000',
       levelId: 'lvl-3',
       status: 'active',
       enrolledAt: '2026-07-10',
@@ -171,7 +172,7 @@ export const INITIAL_DATA = {
       name: 'Esteban Paredes',
       documentId: '3002',
       phone: '+34622222333',
-      password: '1234',
+      password: '0000',
       levelId: 'lvl-3',
       status: 'active',
       enrolledAt: '2026-07-10',
@@ -218,13 +219,13 @@ export const storageService = {
         if (parsed.students) {
           parsed.students = parsed.students.map(s => ({
             ...s,
-            password: s.password || '1234'
+            password: s.password || '0000'
           }));
         }
         if (parsed.teachers) {
           parsed.teachers = parsed.teachers.map(t => ({
             ...t,
-            password: t.password || '1234'
+            password: t.password || '0000'
           }));
         }
         return parsed;
@@ -403,30 +404,44 @@ export const storageService = {
   // Gestión de Profesores
   saveTeacher(teacher) {
     const data = this.getData();
+    let savedTeacher = null;
     if (teacher.id) {
       const idx = data.teachers.findIndex(t => t.id === teacher.id);
       if (idx >= 0) {
         data.teachers[idx] = { 
           ...data.teachers[idx], 
           ...teacher,
-          password: teacher.password || data.teachers[idx].password || '1234'
+          password: teacher.password || data.teachers[idx].password || '0000'
         };
+        savedTeacher = data.teachers[idx];
       }
     } else {
       const newTeacher = {
         ...teacher,
         id: `tch-${Date.now()}`,
-        password: teacher.password || '1234',
+        password: teacher.password || '0000',
       };
       data.teachers.push(newTeacher);
+      savedTeacher = newTeacher;
     }
     this.saveData(data);
+
+    // Sincronizar credencial de profesor en Firebase
+    if (savedTeacher) {
+      syncCredentialToFirestore('teacher', savedTeacher);
+    }
   },
 
   deleteTeacher(teacherId) {
     const data = this.getData();
+    const teacherToDelete = data.teachers.find(t => t.id === teacherId);
     data.teachers = data.teachers.filter(t => t.id !== teacherId);
     this.saveData(data);
+
+    // Eliminar credencial de Firebase
+    if (teacherToDelete?.phone) {
+      deleteCredentialFromFirestore('teacher', teacherToDelete.phone);
+    }
   },
 
   // Validar acceso del profesor por teléfono y contraseña
@@ -453,7 +468,7 @@ export const storageService = {
       return { success: false, error: 'No se encontró ningún profesor con ese número de teléfono.' };
     }
 
-    const expectedPass = teacher.password || '1234';
+    const expectedPass = teacher.password || '0000';
     if (passwordInput !== expectedPass) {
       return { success: false, error: 'Contraseña de profesor incorrecta.' };
     }
@@ -464,34 +479,48 @@ export const storageService = {
   // Gestión de Estudiantes
   saveStudent(student) {
     const data = this.getData();
+    let savedStudent = null;
     if (student.id) {
       const idx = data.students.findIndex(s => s.id === student.id);
       if (idx >= 0) {
         data.students[idx] = { 
           ...data.students[idx], 
           ...student,
-          password: student.password || data.students[idx].password || '1234'
+          password: student.password || data.students[idx].password || '0000'
         };
+        savedStudent = data.students[idx];
       }
     } else {
       const newStudent = {
         ...student,
         id: `std-${Date.now()}`,
-        password: student.password || '1234',
+        password: student.password || '0000',
         status: student.status || 'active',
         enrolledAt: student.enrolledAt || new Date().toISOString().slice(0, 10),
       };
       data.students.push(newStudent);
+      savedStudent = newStudent;
     }
     this.saveData(data);
+
+    // Sincronizar credencial de alumno en Firebase
+    if (savedStudent) {
+      syncCredentialToFirestore('student', savedStudent);
+    }
   },
 
   deleteStudent(studentId) {
     const data = this.getData();
+    const studentToDelete = data.students.find(s => s.id === studentId);
     data.students = data.students.filter(s => s.id !== studentId);
     // Eliminar también sus asistencias
     data.attendance = data.attendance.filter(a => a.studentId !== studentId);
     this.saveData(data);
+
+    // Eliminar credencial de Firebase
+    if (studentToDelete?.phone) {
+      deleteCredentialFromFirestore('student', studentToDelete.phone);
+    }
   },
 
   // Validar fichaje del estudiante por teléfono y contraseña
@@ -522,7 +551,7 @@ export const storageService = {
       return { success: false, error: 'El estudiante no se encuentra en estado activo.' };
     }
 
-    const expectedPass = student.password || '1234';
+    const expectedPass = student.password || '0000';
     if (passwordInput !== expectedPass) {
       return { success: false, error: 'Contraseña de estudiante incorrecta.' };
     }
@@ -587,6 +616,13 @@ export const storageService = {
     if (newUsername) data.settings.adminUser = newUsername.trim();
     if (newPassword) data.settings.adminPassword = newPassword;
     this.saveData(data);
+
+    // Sincronizar credencial de administrador en Firebase
+    syncCredentialToFirestore('admin', {
+      username: data.settings.adminUser,
+      password: data.settings.adminPassword,
+    });
+
     return { success: true };
   },
 
@@ -604,7 +640,7 @@ export const storageService = {
 
   // ═══ Métodos de Sincronización Firebase ═══
 
-  // Forzar subida de datos locales hacia Firebase
+  // Forzar subida de datos locales y credenciales hacia Firebase
   async pushLocalDataToFirestore() {
     const db = getDb();
     if (!db || !isFirebaseConfigured()) {
@@ -613,6 +649,28 @@ export const storageService = {
     const localData = this.getData();
     const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
     await setDoc(docRef, localData);
+
+    // Subir todas las credenciales a la colección 'credentials' en Firebase
+    try {
+      // 1. Admin
+      await syncCredentialToFirestore('admin', {
+        username: localData.settings?.adminUser || 'admin',
+        password: localData.settings?.adminPassword || 'password123'
+      });
+
+      // 2. Profesores (usuario = teléfono, contraseña = password || '0000')
+      for (const teacher of (localData.teachers || [])) {
+        await syncCredentialToFirestore('teacher', teacher);
+      }
+
+      // 3. Alumnos (usuario = teléfono, contraseña = password || '0000')
+      for (const student of (localData.students || [])) {
+        await syncCredentialToFirestore('student', student);
+      }
+    } catch (credErr) {
+      console.warn('Aviso al subir colección de credenciales:', credErr);
+    }
+
     return { success: true };
   },
 
@@ -682,4 +740,88 @@ export function setupFirestoreSync() {
 
 // Iniciar sincronización si Firebase está configurado
 setupFirestoreSync();
+
+// ═══ Sincronización de Credenciales en Firestore ('credentials') ═══
+
+/**
+ * Guarda o actualiza una credencial en la colección 'credentials' de Firebase
+ * - Admin: docId = 'admin_{username}', usuario = username, contraseña = password
+ * - Profesor: docId = 'teacher_{cleanPhone}', usuario = teléfono, contraseña = password || '0000'
+ * - Alumno: docId = 'student_{cleanPhone}', usuario = teléfono, contraseña = password || '0000'
+ */
+export async function syncCredentialToFirestore(type, credData) {
+  const db = getDb();
+  if (!db || !isFirebaseConfigured()) return;
+
+  try {
+    let docId = '';
+    let payload = {};
+
+    if (type === 'admin') {
+      const username = (credData.username || 'admin').trim();
+      docId = `admin_${username}`;
+      payload = {
+        role: 'admin',
+        username: username,
+        password: credData.password || 'password123',
+        type: 'admin',
+        updatedAt: new Date().toISOString()
+      };
+    } else if (type === 'teacher') {
+      const cleanPhone = (credData.phone || '').replace(/[^0-9]/g, '');
+      if (!cleanPhone) return;
+      docId = `teacher_${cleanPhone}`;
+      payload = {
+        role: 'teacher',
+        teacherId: credData.id,
+        name: credData.name,
+        phone: credData.phone,
+        username: cleanPhone, // El usuario siempre es el número telefónico
+        password: credData.password || '0000', // Contraseña por defecto 0000
+        type: 'teacher',
+        updatedAt: new Date().toISOString()
+      };
+    } else if (type === 'student') {
+      const cleanPhone = (credData.phone || '').replace(/[^0-9]/g, '');
+      if (!cleanPhone) return;
+      docId = `student_${cleanPhone}`;
+      payload = {
+        role: 'student',
+        studentId: credData.id,
+        name: credData.name,
+        phone: credData.phone,
+        documentId: credData.documentId || '',
+        username: cleanPhone, // El usuario siempre es el número telefónico
+        password: credData.password || '0000', // Contraseña por defecto 0000
+        levelId: credData.levelId,
+        status: credData.status || 'active',
+        type: 'student',
+        updatedAt: new Date().toISOString()
+      };
+    }
+
+    if (docId) {
+      await setDoc(doc(db, FIRESTORE_CREDENTIALS_COLLECTION, docId), payload, { merge: true });
+    }
+  } catch (err) {
+    console.warn(`Aviso al guardar credencial ${type} en Firebase:`, err);
+  }
+}
+
+/**
+ * Elimina una credencial de la colección 'credentials' de Firebase
+ */
+export async function deleteCredentialFromFirestore(type, identifier) {
+  const db = getDb();
+  if (!db || !isFirebaseConfigured()) return;
+
+  try {
+    const cleanId = (identifier || '').replace(/[^0-9]/g, '');
+    const docId = cleanId ? `${type}_${cleanId}` : `${type}_${identifier}`;
+    await deleteDoc(doc(db, FIRESTORE_CREDENTIALS_COLLECTION, docId));
+  } catch (err) {
+    console.warn(`Aviso al eliminar credencial ${type} de Firebase:`, err);
+  }
+}
+
 
