@@ -1,15 +1,15 @@
-// src/components/admin/StudentsManager.jsx
-// Gestión de Estudiantes: creación, edición, asignación/cambio de nivel y búsqueda
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Search, Phone, BookOpen, User, Check, X, Filter, MessageCircle, Key, CheckCircle2, AlertTriangle, GraduationCap, IdCard } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Phone, BookOpen, User, Check, X, Filter, MessageCircle, Key, CheckCircle2, AlertTriangle, GraduationCap, IdCard, ClipboardList } from 'lucide-react';
 import { storageService } from '../../services/storageService';
+import StudentControlSheet from './StudentControlSheet';
 
-export default function StudentsManager({ data }) {
+export default function StudentsManager({ data, currentTeacher = null }) {
   const { students = [], levels = [], attendance = [] } = data;
   const [searchTerm, setSearchTerm] = useState('');
   const [filterLevelId, setFilterLevelId] = useState('ALL');
   const [filterStatus, setFilterStatus] = useState('active');
+
+  const [selectedStudentForSheet, setSelectedStudentForSheet] = useState(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
@@ -139,6 +139,19 @@ export default function StudentsManager({ data }) {
   const togglePopover = (studentId) => {
     setPopoverStudentId(prev => prev === studentId ? null : studentId);
   };
+
+  // Si se ha seleccionado un estudiante, mostramos su Ficha de Control individual
+  if (selectedStudentForSheet) {
+    const currentStudent = students.find(s => s.id === selectedStudentForSheet.id) || selectedStudentForSheet;
+    return (
+      <StudentControlSheet
+        student={currentStudent}
+        data={data}
+        currentTeacher={currentTeacher}
+        onBack={() => setSelectedStudentForSheet(null)}
+      />
+    );
+  }
 
   return (
     <div>
@@ -284,7 +297,27 @@ export default function StudentsManager({ data }) {
                       {renderStatusIcon(student.status)}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', gap: '6px' }}>
+                      <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
+                        <button 
+                          className="btn btn-primary btn-sm" 
+                          onClick={() => setSelectedStudentForSheet(student)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            padding: '5px 12px',
+                            fontSize: '0.8rem',
+                            fontWeight: '700',
+                            background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                            color: '#ffffff',
+                            border: 'none',
+                            boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
+                            cursor: 'pointer'
+                          }}
+                          title="Abrir Ficha de Control, Fichajes y Deberes"
+                        >
+                          <ClipboardList size={13} /> Ficha
+                        </button>
                         <button 
                           className="btn btn-outline btn-sm" 
                           onClick={() => openEditModal(student)}

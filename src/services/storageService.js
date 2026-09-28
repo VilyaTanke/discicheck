@@ -197,6 +197,29 @@ export const INITIAL_DATA = {
     { id: 'att-9', studentId: 'std-202', levelId: 'lvl-2', date: '2026-09-18', timestamp: '2026-09-18T19:21:00Z', status: 'present', checkedInBy: 'student_self' },
     { id: 'att-10', studentId: 'std-203', levelId: 'lvl-2', date: '2026-09-18', timestamp: '2026-09-18T19:30:00Z', status: 'absent', checkedInBy: 'admin' },
   ],
+  homework: [
+    // Nivel 1 - Fundamentos de la Fe
+    { id: 'hw-101', levelId: 'lvl-1', title: 'Lectura Evangelio de Juan (Cap. 1 al 3)', description: 'Lectura bíblica y responder las preguntas del cuaderno de bienvenida.', dueDate: '2026-09-15' },
+    { id: 'hw-102', levelId: 'lvl-1', title: 'Memorización Bíblica: Juan 3:16', description: 'Aprender y recitar de memoria el versículo clave de salvación.', dueDate: '2026-09-22' },
+    { id: 'hw-103', levelId: 'lvl-1', title: 'Cuestionario: La Gracia y la Salvación', description: 'Completar la guía de estudio de Efesios 2:8-10.', dueDate: '2026-09-29' },
+    { id: 'hw-104', levelId: 'lvl-1', title: 'Testimonio de Fe Personal', description: 'Escribir una breve reflexión personal sobre tu nuevo nacimiento en Cristo.', dueDate: '2026-10-06' },
+
+    // Nivel 2 - Vida Discipular
+    { id: 'hw-201', levelId: 'lvl-2', title: 'Diario Devocional: 7 Días con los Salmos', description: 'Llevar el registro de lectura y oración diaria de la semana.', dueDate: '2026-09-18' },
+    { id: 'hw-202', levelId: 'lvl-2', title: 'Estudio de Carácter: Fruto del Espíritu', description: 'Completar el cuestionario práctico de Gálatas 5:22-23.', dueDate: '2026-09-25' },
+    { id: 'hw-203', levelId: 'lvl-2', title: 'Práctica de Intercesión en Familia', description: 'Orar durante la semana por una lista de 3 peticiones específicas.', dueDate: '2026-10-02' },
+
+    // Nivel 3 - Liderazgo y Ministerio
+    { id: 'hw-301', levelId: 'lvl-3', title: 'Diseño de Dinámica para Grupo Celular', description: 'Presentar un bosquejo de reunión con rompehielo y aplicación práctica.', dueDate: '2026-09-20' },
+    { id: 'hw-302', levelId: 'lvl-3', title: 'Acompañamiento a un Nuevo Creyente', description: 'Plan de mentoría y reporte de seguimiento con un estudiante de Nivel 1.', dueDate: '2026-09-27' },
+    { id: 'hw-303', levelId: 'lvl-3', title: 'Proyecto de Servicio Comunitario', description: 'Planificar una actividad de ayuda social con el equipo de líderes.', dueDate: '2026-10-04' },
+  ],
+  homeworkSubmissions: [
+    { id: 'sub-1', studentId: 'std-101', homeworkId: 'hw-101', isCompleted: true, completedAt: '2026-09-14T18:30:00Z', notes: 'Excelente resumen y puntualidad.' },
+    { id: 'sub-2', studentId: 'std-101', homeworkId: 'hw-102', isCompleted: true, completedAt: '2026-09-21T19:00:00Z', notes: 'Recitado de memoria con total fluidez.' },
+    { id: 'sub-3', studentId: 'std-102', homeworkId: 'hw-101', isCompleted: true, completedAt: '2026-09-15T10:15:00Z', notes: 'Completado satisfactoriamente.' },
+    { id: 'sub-4', studentId: 'std-201', homeworkId: 'hw-201', isCompleted: true, completedAt: '2026-09-18T17:45:00Z', notes: 'Diario devocional muy completo y profundo.' },
+  ],
   settings: {
     institutionName: 'Escuela de Discipulado',
     welcomeMessage: '¡Bienvenido(a)! Que la palabra de hoy sea de gran bendición para tu vida espiritual.',
@@ -227,6 +250,12 @@ export const storageService = {
             ...t,
             password: t.password || '0000'
           }));
+        }
+        if (!parsed.homework) {
+          parsed.homework = INITIAL_DATA.homework;
+        }
+        if (!parsed.homeworkSubmissions) {
+          parsed.homeworkSubmissions = INITIAL_DATA.homeworkSubmissions;
         }
         return parsed;
       }
@@ -296,6 +325,7 @@ export const storageService = {
       ...INITIAL_DATA,
       students: [],
       attendance: [],
+      homeworkSubmissions: [],
       settings: currentData.settings || INITIAL_DATA.settings
     };
     this.saveData(emptyData);
@@ -338,14 +368,14 @@ export const storageService = {
     );
   },
 
-  // Fichar asistencia
+  // Fichar o registrar asistencia (presente, falta, justificada)
   recordAttendance({ studentId, levelId, date = null, status = 'present', checkedInBy = 'student_self', notes = '' }) {
     const data = this.getData();
     const recordDate = date || new Date().toISOString().slice(0, 10);
     
     // Buscar si ya existe un registro de asistencia para este alumno en esta fecha
-    const existingIndex = data.attendance.findIndex(
-      a => a.studentId === studentId && a.levelId === levelId && a.date === recordDate
+    const existingIndex = (data.attendance || []).findIndex(
+      a => a.studentId === studentId && a.date === recordDate
     );
 
     const nowIso = new Date().toISOString();
@@ -354,10 +384,11 @@ export const storageService = {
       // Actualizar registro existente
       data.attendance[existingIndex] = {
         ...data.attendance[existingIndex],
+        levelId: levelId || data.attendance[existingIndex].levelId,
         status,
         timestamp: nowIso,
-        checkedInBy,
-        notes: notes || data.attendance[existingIndex].notes,
+        checkedInBy: checkedInBy || data.attendance[existingIndex].checkedInBy,
+        notes: notes !== undefined ? notes : data.attendance[existingIndex].notes,
       };
     } else {
       // Nuevo registro
@@ -369,13 +400,109 @@ export const storageService = {
         timestamp: nowIso,
         status,
         checkedInBy,
-        notes,
+        notes: notes || '',
       };
+      if (!data.attendance) data.attendance = [];
       data.attendance.push(newRecord);
     }
 
     this.saveData(data);
     return { success: true, date: recordDate, timestamp: nowIso };
+  },
+
+  // Eliminar registro de asistencia
+  deleteAttendance(attendanceId) {
+    const data = this.getData();
+    data.attendance = (data.attendance || []).filter(a => a.id !== attendanceId);
+    this.saveData(data);
+    return { success: true };
+  },
+
+  // ═══ Control de Deberes / Tareas ═══
+
+  // Alternar o marcar entrega de deber por el profesor
+  toggleHomeworkSubmission({ studentId, homeworkId, isCompleted, notes = '' }) {
+    const data = this.getData();
+    if (!data.homeworkSubmissions) data.homeworkSubmissions = [];
+
+    const existingIndex = data.homeworkSubmissions.findIndex(
+      s => s.studentId === studentId && s.homeworkId === homeworkId
+    );
+
+    const nowIso = new Date().toISOString();
+
+    if (existingIndex >= 0) {
+      data.homeworkSubmissions[existingIndex] = {
+        ...data.homeworkSubmissions[existingIndex],
+        isCompleted: !!isCompleted,
+        completedAt: isCompleted ? (data.homeworkSubmissions[existingIndex].completedAt || nowIso) : null,
+        notes: notes !== undefined ? notes : data.homeworkSubmissions[existingIndex].notes || '',
+      };
+    } else {
+      data.homeworkSubmissions.push({
+        id: `sub-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        studentId,
+        homeworkId,
+        isCompleted: !!isCompleted,
+        completedAt: isCompleted ? nowIso : null,
+        notes: notes || '',
+      });
+    }
+
+    this.saveData(data);
+    return { success: true };
+  },
+
+  // Actualizar nota u observación del profesor en la entrega
+  updateHomeworkSubmissionNotes({ studentId, homeworkId, notes }) {
+    const data = this.getData();
+    if (!data.homeworkSubmissions) data.homeworkSubmissions = [];
+
+    const existingIndex = data.homeworkSubmissions.findIndex(
+      s => s.studentId === studentId && s.homeworkId === homeworkId
+    );
+
+    if (existingIndex >= 0) {
+      data.homeworkSubmissions[existingIndex].notes = notes || '';
+      this.saveData(data);
+      return { success: true };
+    }
+    return { success: false, error: 'No existe entrega registrada' };
+  },
+
+  // Guardar o crear un deber
+  saveHomework(homeworkItem) {
+    const data = this.getData();
+    if (!data.homework) data.homework = [];
+
+    if (homeworkItem.id) {
+      const idx = data.homework.findIndex(h => h.id === homeworkItem.id);
+      if (idx >= 0) {
+        data.homework[idx] = { ...data.homework[idx], ...homeworkItem };
+      }
+    } else {
+      const newHw = {
+        ...homeworkItem,
+        id: `hw-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+      };
+      data.homework.push(newHw);
+    }
+    this.saveData(data);
+    return { success: true };
+  },
+
+  // Eliminar un deber
+  deleteHomework(homeworkId) {
+    const data = this.getData();
+    if (data.homework) {
+      data.homework = data.homework.filter(h => h.id !== homeworkId);
+    }
+    if (data.homeworkSubmissions) {
+      data.homeworkSubmissions = data.homeworkSubmissions.filter(s => s.homeworkId !== homeworkId);
+    }
+    this.saveData(data);
+    return { success: true };
   },
 
   // Gestión de Niveles
