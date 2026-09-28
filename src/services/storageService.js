@@ -1,7 +1,15 @@
 // src/services/storageService.js
 // Servicio de datos y persistencia para Control de Asistencia Discipulado
+// Soporta modo Offline (localStorage) y Sincronización en Tiempo Real con Firebase Cloud Firestore
+
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { getDb, isFirebaseConfigured, initFirebase } from './firebase';
 
 const STORAGE_KEY = 'discipulado_attendance_data_v1';
+const FIRESTORE_COLLECTION = 'discipulado';
+const FIRESTORE_DOC = 'database';
+
+let unsubscribeFirestore = null;
 
 // Datos iniciales de demostración con Niveles 1, 2 y 3
 export const INITIAL_DATA = {
@@ -230,12 +238,27 @@ export const storageService = {
   },
 
   // Guardar datos y notificar a los componentes
-  saveData(data) {
+  saveData(data, syncRemote = true) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       this.notifyListeners(data);
     } catch (e) {
       console.error('Error al guardar en localStorage:', e);
+    }
+
+    // Sincronizar con Firebase Firestore en segundo plano si está disponible
+    if (syncRemote) {
+      const db = getDb();
+      if (db && isFirebaseConfigured()) {
+        try {
+          const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
+          setDoc(docRef, data, { merge: true }).catch(err => {
+            console.warn('Aviso: No se pudo sincronizar en Firestore:', err);
+          });
+        } catch (err) {
+          console.warn('Error al iniciar sincronización con Firestore:', err);
+        }
+      }
     }
   },
 
@@ -577,5 +600,86 @@ export const storageService = {
     data.settings.churchPastor = churchPastor || '';
     this.saveData(data);
     return { success: true };
+  },
+
+  // ═══ Métodos de Sincronización Firebase ═══
+
+  // Forzar subida de datos locales hacia Firebase
+  async pushLocalDataToFirestore() {
+    const db = getDb();
+    if (!db || !isFirebaseConfigured()) {
+      throw new Error('Firebase no está configurado o no se pudo inicializar.');
+    }
+    const localData = this.getData();
+    const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
+    await setDoc(docRef, localData);
+    return { success: true };
+  },
+
+  // Forzar descarga de datos desde Firebase hacia local
+  async pullDataFromFirestore() {
+    const db = getDb();
+    if (!db || !isFirebaseConfigured()) {
+      throw new Error('Firebase no está configurado o no se pudo inicializar.');
+    }
+    const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      this.saveData(data, false);
+      return { success: true, data };
+    } else {
+      throw new Error('El documento en Firestore aún no contiene datos.');
+    }
+  },
+
+  // Reiniciar escucha y sincronización de Firestore
+  reconnectFirebase() {
+    initFirebase();
+    setupFirestoreSync();
   }
 };
+
+// ═══ Configuración de escucha en tiempo real con Firestore ═══
+export function setupFirestoreSync() {
+  if (unsubscribeFirestore) {
+    unsubscribeFirestore();
+    unsubscribeFirestore = null;
+  }
+
+  const db = getDb();
+  if (!db || !isFirebaseConfigured()) {
+    return;
+  }
+
+  try {
+    const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
+    unsubscribeFirestore = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const remoteData = docSnap.data();
+        if (remoteData) {
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteData));
+          } catch (e) {
+            console.error('Error al actualizar caché local desde Firestore:', e);
+          }
+          storageService.notifyListeners(remoteData);
+        }
+      } else {
+        // Inicializar documento remoto si está vacío
+        const localData = storageService.getData();
+        setDoc(docRef, localData).catch(err => {
+          console.warn('Aviso: No se pudo inicializar documento en Firestore:', err);
+        });
+      }
+    }, (error) => {
+      console.warn('Aviso conexión Firestore:', error.message);
+    });
+  } catch (err) {
+    console.warn('Error al conectar escucha Firestore:', err);
+  }
+}
+
+// Iniciar sincronización si Firebase está configurado
+setupFirestoreSync();
+

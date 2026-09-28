@@ -19,10 +19,15 @@ import {
   MapPin,
   Phone,
   User,
-  Trash2
+  Trash2,
+  Flame,
+  Zap,
+  CheckCircle2,
+  Edit
 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 import { exportExcelReport } from '../../services/excelExportService';
+import { isFirebaseConfigured, getFirebaseConfig, saveFirebaseConfig } from '../../services/firebase';
 
 export default function BackupSettings({ data }) {
   const [importStatus, setImportStatus] = useState(null);
@@ -36,6 +41,22 @@ export default function BackupSettings({ data }) {
   const [churchPhone, setChurchPhone] = useState(data.settings?.churchPhone || '');
   const [churchPastor, setChurchPastor] = useState(data.settings?.churchPastor || '');
   const [churchStatus, setChurchStatus] = useState(null);
+
+  // ═══ Estado Firebase ═══
+  const [isFirebaseActive, setIsFirebaseActive] = useState(() => isFirebaseConfigured());
+  const [currentFbConfig, setCurrentFbConfig] = useState(() => getFirebaseConfig());
+  const [showFbForm, setShowFbForm] = useState(!isFirebaseConfigured());
+  const [fbStatus, setFbStatus] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [fbForm, setFbForm] = useState({
+    apiKey: currentFbConfig?.apiKey || '',
+    authDomain: currentFbConfig?.authDomain || '',
+    projectId: currentFbConfig?.projectId || '',
+    storageBucket: currentFbConfig?.storageBucket || '',
+    messagingSenderId: currentFbConfig?.messagingSenderId || '',
+    appId: currentFbConfig?.appId || '',
+  });
+  const [rawSnippet, setRawSnippet] = useState('');
 
   const handleSaveChurchInfo = (e) => {
     e.preventDefault();
@@ -84,6 +105,92 @@ export default function BackupSettings({ data }) {
     if (window.confirm('¿Deseas restablecer los datos a los valores iniciales de demostración (Niveles 1, 2 y 3 con estudiantes de prueba)? Se perderán los cambios locales no exportados.')) {
       storageService.resetData();
       setImportStatus({ type: 'success', text: 'Datos restablecidos a la configuración de prueba inicial.' });
+    }
+  };
+
+  // Autodetectar valores si el usuario pega el bloque de código de Firebase
+  const handlePasteRawSnippet = (text) => {
+    setRawSnippet(text);
+    const extract = (key) => {
+      const match = text.match(new RegExp(`['"]?${key}['"]?\\s*:\\s*['"]([^'"]+)['"]`));
+      return match ? match[1] : '';
+    };
+
+    const apiKey = extract('apiKey');
+    const projectId = extract('projectId');
+    const authDomain = extract('authDomain');
+    const storageBucket = extract('storageBucket');
+    const messagingSenderId = extract('messagingSenderId');
+    const appId = extract('appId');
+
+    if (apiKey || projectId) {
+      setFbForm(prev => ({
+        ...prev,
+        apiKey: apiKey || prev.apiKey,
+        projectId: projectId || prev.projectId,
+        authDomain: authDomain || prev.authDomain,
+        storageBucket: storageBucket || prev.storageBucket,
+        messagingSenderId: messagingSenderId || prev.messagingSenderId,
+        appId: appId || prev.appId,
+      }));
+      setFbStatus({ type: 'success', text: '¡Datos de Firebase detectados y cargados automáticamente en el formulario!' });
+    }
+  };
+
+  const handleSaveFirebase = (e) => {
+    e.preventDefault();
+    if (!fbForm.apiKey.trim() || !fbForm.projectId.trim()) {
+      setFbStatus({ type: 'error', text: 'Por favor ingresa al menos apiKey y projectId.' });
+      return;
+    }
+
+    try {
+      saveFirebaseConfig(fbForm);
+      storageService.reconnectFirebase();
+      const updatedConfig = getFirebaseConfig();
+      setCurrentFbConfig(updatedConfig);
+      setIsFirebaseActive(true);
+      setShowFbForm(false);
+      setFbStatus({ type: 'success', text: '¡Firebase Firestore conectado exitosamente! Sincronización en tiempo real activa.' });
+    } catch (err) {
+      setFbStatus({ type: 'error', text: `Error al guardar: ${err.message}` });
+    }
+  };
+
+  const handlePushToFirebase = async () => {
+    setIsSyncing(true);
+    setFbStatus(null);
+    try {
+      await storageService.pushLocalDataToFirestore();
+      setFbStatus({ type: 'success', text: '¡Datos locales subidos y sincronizados en la nube de Firebase!' });
+    } catch (err) {
+      setFbStatus({ type: 'error', text: `Error al subir: ${err.message}` });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handlePullFromFirebase = async () => {
+    setIsSyncing(true);
+    setFbStatus(null);
+    try {
+      await storageService.pullDataFromFirestore();
+      setFbStatus({ type: 'success', text: '¡Datos descargados de Firebase y actualizados en este dispositivo!' });
+    } catch (err) {
+      setFbStatus({ type: 'error', text: `Error al descargar: ${err.message}` });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleDisconnectFirebase = () => {
+    if (window.confirm('¿Deseas desconectar Firebase de este navegador? La app volverá al modo de almacenamiento local independiente.')) {
+      saveFirebaseConfig(null);
+      storageService.reconnectFirebase();
+      setIsFirebaseActive(false);
+      setCurrentFbConfig(null);
+      setShowFbForm(true);
+      setFbStatus({ type: 'success', text: 'Firebase desconectado. Modo almacenamiento local activo.' });
     }
   };
 
@@ -245,27 +352,207 @@ export default function BackupSettings({ data }) {
         </label>
       </div>
 
-      {/* ═══ Info GitHub Pages ═══ */}
+      {/* ═══ Sincronización Firebase Firestore ═══ */}
       <div className="glass-panel" style={{
-        padding: '20px',
+        padding: '22px',
         marginBottom: '20px',
-        border: '1px solid rgba(99, 102, 241, 0.3)',
-        background: 'rgba(99, 102, 241, 0.05)'
+        border: isFirebaseActive ? '1.5px solid rgba(16, 185, 129, 0.4)' : '1.5px solid rgba(245, 158, 11, 0.35)',
+        background: isFirebaseActive ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(255, 255, 255, 0.9))' : 'linear-gradient(135deg, rgba(245, 158, 11, 0.05), rgba(255, 255, 255, 0.9))'
       }}>
-        <h4 style={{ fontSize: '1.1rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px', color: '#a5b4fc' }}>
-          <Cloud size={18} /> ¿Cómo funciona la persistencia en GitHub Pages?
-        </h4>
-        <div style={{ fontSize: '0.87rem', color: 'var(--text-muted)', lineHeight: '1.6' }}>
-          <p style={{ marginBottom: '8px' }}>
-            <strong>GitHub Pages</strong> es un servidor web gratuito y de alta velocidad para páginas estáticas. Actualmente, la app guarda los datos en el almacenamiento local seguro de cada navegador (PWA con LocalStorage).
-          </p>
-          <p style={{ marginBottom: '8px' }}>
-            Para que <strong>múltiples teléfonos de estudiantes y el panel del administrador sincronicen en la nube en tiempo real</strong> sin coste alguno, la mejor opción gratuita es conectar <strong>Google Firebase Firestore</strong> (Google Cloud ofrece un plan 100% gratuito de 50.000 lecturas diarias, más que suficiente para una iglesia o ministerio).
-          </p>
-          <p>
-            Mientras tanto, puedes usar la app directamente, exportar tus respaldos periódicamente en Excel o JSON, y compartir la URL pública de GitHub Pages con los hermanos.
-          </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Flame size={20} color={isFirebaseActive ? '#10B981' : '#F59E0B'} />
+              <h4 style={{ fontSize: '1.15rem', margin: 0, color: 'var(--text-main)' }}>
+                Base de Datos en la Nube (Firebase Firestore)
+              </h4>
+            </div>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '4px' }}>
+              Permite que los estudiantes fichen desde sus teléfonos móviles y que el administrador y los profesores vean los datos sincronizados en tiempo real.
+            </p>
+          </div>
+
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '5px 12px',
+            borderRadius: 'var(--radius-pill)',
+            fontSize: '0.8rem',
+            fontWeight: '600',
+            background: isFirebaseActive ? '#D1FAE5' : '#FEF3C7',
+            color: isFirebaseActive ? '#065F46' : '#92400E',
+            border: isFirebaseActive ? '1px solid #A7F3D0' : '1px solid #FDE68A'
+          }}>
+            {isFirebaseActive ? <CheckCircle2 size={14} /> : <Zap size={14} />}
+            {isFirebaseActive ? 'Conectado en Tiempo Real' : 'Modo Almacenamiento Local'}
+          </span>
         </div>
+
+        <StatusBanner status={fbStatus} />
+
+        {isFirebaseActive && !showFbForm ? (
+          <div>
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.8)',
+              padding: '14px 18px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--border-card)',
+              marginBottom: '16px',
+              fontSize: '0.85rem',
+              lineHeight: '1.6'
+            }}>
+              <div><strong>Proyecto Firebase:</strong> <code style={{ color: '#047857' }}>{currentFbConfig?.projectId}</code></div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: '4px' }}>
+                Todos los cambios realizados se sincronizan automáticamente con Cloud Firestore.
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <button 
+                type="button" 
+                className="btn btn-primary btn-sm" 
+                onClick={handlePushToFirebase}
+                disabled={isSyncing}
+                style={{ background: '#10B981', borderColor: '#059669' }}
+              >
+                <Upload size={14} /> {isSyncing ? 'Sincronizando...' : 'Subir Datos Locales a Firebase'}
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-outline btn-sm" 
+                onClick={handlePullFromFirebase}
+                disabled={isSyncing}
+              >
+                <Download size={14} /> Descargar Datos desde Firebase
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-outline btn-sm" 
+                onClick={() => setShowFbForm(true)}
+              >
+                <Edit size={14} /> Modificar Credenciales
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-danger-outline btn-sm" 
+                onClick={handleDisconnectFirebase}
+              >
+                Desconectar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            {/* Campo Rápido para Pegar el Bloque de Firebase */}
+            <div style={{
+              background: 'var(--c-sky-lightest)',
+              padding: '14px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1.5px dashed var(--border-card)',
+              marginBottom: '18px'
+            }}>
+              <label className="form-label" style={{ fontWeight: '700', color: '#1E3A8A' }}>
+                📋 Atajo: Pega aquí la configuración de Firebase Console
+              </label>
+              <textarea
+                className="form-input"
+                rows="3"
+                placeholder='const firebaseConfig = { apiKey: "AIza...", projectId: "...", ... };'
+                value={rawSnippet}
+                onChange={(e) => handlePasteRawSnippet(e.target.value)}
+                style={{ fontFamily: 'monospace', fontSize: '0.78rem' }}
+              />
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                Al pegar el texto de la consola de Firebase, los campos inferiores se autocompletarán automáticamente.
+              </span>
+            </div>
+
+            {/* Formulario Manual de Credenciales */}
+            <form onSubmit={handleSaveFirebase}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label">API Key *</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    required
+                    placeholder="AIzaSy..."
+                    value={fbForm.apiKey}
+                    onChange={(e) => setFbForm({ ...fbForm, apiKey: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Project ID *</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    required
+                    placeholder="tu-proyecto-discipulado"
+                    value={fbForm.projectId}
+                    onChange={(e) => setFbForm({ ...fbForm, projectId: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Auth Domain</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="tu-proyecto.firebaseapp.com"
+                    value={fbForm.authDomain}
+                    onChange={(e) => setFbForm({ ...fbForm, authDomain: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Storage Bucket</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="tu-proyecto.appspot.com"
+                    value={fbForm.storageBucket}
+                    onChange={(e) => setFbForm({ ...fbForm, storageBucket: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Messaging Sender ID</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="1234567890"
+                    value={fbForm.messagingSenderId}
+                    onChange={(e) => setFbForm({ ...fbForm, messagingSenderId: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">App ID</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="1:1234567890:web:abcdef..."
+                    value={fbForm.appId}
+                    onChange={(e) => setFbForm({ ...fbForm, appId: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+                <button type="submit" className="btn btn-primary" style={{ background: '#10B981', borderColor: '#059669' }}>
+                  <Flame size={16} /> Guardar y Conectar a Firebase
+                </button>
+                {isFirebaseActive && (
+                  <button type="button" className="btn btn-outline" onClick={() => setShowFbForm(false)}>
+                    Cancelar
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+        )}
       </div>
 
       {/* ═══ Seguridad Admin ═══ */}
