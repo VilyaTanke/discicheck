@@ -3,7 +3,7 @@ import { Plus, Edit2, Trash2, BookOpen, Clock, MapPin, User, Users, Check, X } f
 import { storageService } from '../../services/storageService';
 
 export default function LevelsManager({ data }) {
-  const { levels = [], teachers = [], students = [] } = data;
+  const { levels = [], teachers = [], students = [], attendance = [] } = data;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLevel, setEditingLevel] = useState(null);
 
@@ -13,6 +13,7 @@ export default function LevelsManager({ data }) {
     dayOfWeek: 'Martes',
     time: '19:30 - 21:00',
     room: '',
+    totalClasses: 12,
     teacherIds: [],
   });
 
@@ -24,6 +25,7 @@ export default function LevelsManager({ data }) {
       dayOfWeek: 'Martes',
       time: '19:30 - 21:00',
       room: '',
+      totalClasses: 12,
       teacherIds: teachers[0]?.id ? [teachers[0].id] : [],
     });
     setIsModalOpen(true);
@@ -41,6 +43,7 @@ export default function LevelsManager({ data }) {
       dayOfWeek: level.dayOfWeek || 'Martes',
       time: level.time || '19:30 - 21:00',
       room: level.room || '',
+      totalClasses: Number(level.totalClasses) || 12,
       teacherIds: initialTeacherIds,
     });
     setIsModalOpen(true);
@@ -101,6 +104,10 @@ export default function LevelsManager({ data }) {
             (Array.isArray(level.teacherIds) && level.teacherIds.includes(t.id)) || t.id === level.teacherId
           );
           const studentCount = students.filter(s => s.levelId === level.id).length;
+          const heldClassDates = [...new Set(attendance.filter(a => a.levelId === level.id).map(a => a.date))];
+          const classesHeld = heldClassDates.length;
+          const totalClasses = Number(level.totalClasses) || 12;
+          const classesRemaining = Math.max(0, totalClasses - classesHeld);
 
           return (
             <div key={level.id} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -182,6 +189,17 @@ export default function LevelsManager({ data }) {
                         Sin profesores asignados
                       </span>
                     )}
+                  </div>
+                </div>
+                <div style={{ marginTop: '12px', background: 'var(--c-sky-lightest)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-card)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-main)', marginBottom: '5px' }}>
+                    <span>Clases: {classesHeld} dadas</span>
+                    <span style={{ color: classesRemaining > 0 ? '#b45309' : '#059669' }}>
+                      {classesRemaining > 0 ? `Faltan ${classesRemaining}` : 'Completado'} (Total: {totalClasses})
+                    </span>
+                  </div>
+                  <div style={{ height: '6px', background: 'rgba(203, 213, 225, 0.6)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ width: `${Math.min(100, Math.round((classesHeld / totalClasses) * 100))}%`, height: '100%', background: '#3b82f6', borderRadius: '3px' }} />
                   </div>
                 </div>
               </div>
@@ -278,15 +296,29 @@ export default function LevelsManager({ data }) {
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Aula / Salón</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="Ej. Aula 3, Segundo Piso"
-                    value={formData.room}
-                    onChange={(e) => setFormData({ ...formData, room: e.target.value })}
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="form-group">
+                    <label className="form-label">Aula / Salón</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Ej. Aula 3, Segundo Piso"
+                      value={formData.room}
+                      onChange={(e) => setFormData({ ...formData, room: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Total Clases del Curso</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="52"
+                      className="form-input"
+                      value={formData.totalClasses}
+                      onChange={(e) => setFormData({ ...formData, totalClasses: parseInt(e.target.value) || 12 })}
+                    />
+                  </div>
                 </div>
 
                 <div className="form-group">

@@ -1,5 +1,6 @@
 // src/components/admin/AbsenceTracker.jsx
 // Control de Asistencias, Inasistencias y Seguimiento Pastoral por WhatsApp
+// Enfocado en las clases reales asignadas e impartidas por nivel
 
 import React, { useState, useMemo } from 'react';
 import { 
@@ -13,7 +14,12 @@ import {
   Filter, 
   Download,
   Clock,
-  Sparkles
+  Sparkles,
+  BookOpen,
+  Users,
+  CheckSquare,
+  TrendingUp,
+  Info
 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 import { exportExcelReport } from '../../services/excelExportService';
@@ -21,14 +27,39 @@ import { exportExcelReport } from '../../services/excelExportService';
 export default function AbsenceTracker({ data }) {
   const { levels = [], students = [], attendance = [], teachers = [] } = data;
 
-  // Fecha seleccionada (por defecto hoy)
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
-  // Nivel seleccionado
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  // Nivel seleccionado (por defecto el primero disponible)
   const [selectedLevelId, setSelectedLevelId] = useState(() => levels[0]?.id || '');
-  // Filtro de estado en la lista (todos, solo ausentes, solo presentes)
+
+  // Fechas reales en las que se han impartido clases para este nivel (donde hay al menos un registro de fichaje/asistencia)
+  const heldClassDates = useMemo(() => {
+    if (!selectedLevelId) return [];
+    const datesSet = new Set(
+      attendance
+        .filter(a => a.levelId === selectedLevelId)
+        .map(a => a.date)
+    );
+    return Array.from(datesSet).sort().reverse(); // Fechas ordenadas descendente (más reciente primero)
+  }, [attendance, selectedLevelId]);
+
+  // Fecha seleccionada: por defecto hoy si ya hay fichajes hoy, o la última clase impartida, o hoy
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const firstLvlId = levels[0]?.id;
+    const lvlDates = Array.from(new Set(
+      attendance.filter(a => a.levelId === firstLvlId).map(a => a.date)
+    )).sort().reverse();
+    
+    const today = new Date().toISOString().slice(0, 10);
+    if (lvlDates.includes(today)) return today;
+    if (lvlDates.length > 0) return lvlDates[0];
+    return today;
+  });
+
+  // Filtro de estado en la lista (todos, solo presentes, solo ausentes/pendientes, en riesgo)
   const [statusFilter, setStatusFilter] = useState('ALL');
 
-  // Nivel y profesor activo
+  // Nivel y profesores asignados al nivel actual
   const currentLevel = useMemo(() => {
     return levels.find(l => l.id === selectedLevelId) || levels[0];
   }, [levels, selectedLevelId]);
@@ -38,43 +69,83 @@ export default function AbsenceTracker({ data }) {
       (Array.isArray(currentLevel?.teacherIds) && currentLevel.teacherIds.includes(t.id)) || t.id === currentLevel?.teacherId
     );
   }, [teachers, currentLevel]);
-  const currentTeacher = currentTeachers[0] || null;
+
+  // Manejo de cambio de nivel: reajustar fecha por defecto inteligentemente
+  const handleLevelChange = (lvlId) => {
+    setSelectedLevelId(lvlId);
+    const lvlDates = Array.from(new Set(
+      attendance.filter(a => a.levelId === lvlId).map(a => a.date)
+    )).sort().reverse();
+
+    if (lvlDates.includes(todayStr)) {
+      setSelectedDate(todayStr);
+    } else if (lvlDates.length > 0) {
+      setSelectedDate(lvlDates[0]);
+    } else {
+      setSelectedDate(todayStr);
+    }
+    setStatusFilter('ALL');
+  };
 
   // Estudiantes inscritos activos en este nivel
   const levelStudents = useMemo(() => {
     return students.filter(s => s.levelId === selectedLevelId && s.status === 'active');
   }, [students, selectedLevelId]);
 
-  // Obtener todas las fechas únicas registradas para este nivel (ordenadas de más reciente a más antigua)
-  const distinctSessionDates = useMemo(() => {
-    const dates = new Set(
-      attendance
-        .filter(a => a.levelId === selectedLevelId)
-        .map(a => a.date)
-    );
-    // Incluir la fecha seleccionada actual
-    dates.add(selectedDate);
-    return Array.from(dates).sort().reverse();
-  }, [attendance, selectedLevelId, selectedDate]);
+  // Métricas del curso para este nivel
+  const totalClasses = Number(currentLevel?.totalClasses) || 12;
+  const classesGiven = heldClassDates.length;
+  const classesRemaining = Math.max(0, totalClasses - classesGiven);
+  const levelProgressPercent = totalClasses > 0 ? Math.min(100, Math.round((classesGiven / totalClasses) * 100)) : 0;
 
-  // Calcular faltas consecutivas previas de un estudiante en este nivel
+  // Estado de la fecha seleccionada respecto a las clases impartidas
+  const isSelectedDateHeld = heldClassDates.includes(selectedDate);
+  const isToday = selectedDate === todayStr;
+  const isFuture = selectedDate > todayStr;
+  const hasCheckinsOnSelectedDate = attendance.some(a => a.levelId === selectedLevelId && a.date === selectedDate);
+
+  // Calcular faltas consecutivas de un estudiante basándose EXCLUSIVAMENTE en clases reales impartidas
   const calculateConsecutiveAbsences = (studentId) => {
-    // Buscar sesiones anteriores a la fecha seleccionada
-    const pastDates = distinctSessionDates.filter(d => d < selectedDate);
+    // Clases dadas anteriores a la fecha seleccionada
+    const pastDates = heldClassDates.filter(d => d < selectedDate); // ordenadas de más reciente a más antigua
     let consecutiveCount = 0;
 
+    // Registro del estudiante para la fecha seleccionada
+    const currentRec = attendance.find(
+      a => a.studentId === studentId && a.levelId === selectedLevelId && a.date === selectedDate
+    );
+
+    // 1. Si en la fecha seleccionada asistió, la racha es 0
+    if (currentRec?.status === 'present') {
+      return 0;
+    }
+
+    // 2. Si la fecha seleccionada fue una clase concluida en el pasado y no asistió:
+    const isPastHeldClass = isSelectedDateHeld && selectedDate < todayStr;
+    if (isPastHeldClass && (!currentRec || currentRec.status === 'absent')) {
+      consecutiveCount = 1;
+    } else if (currentRec?.status === 'absent') {
+      // Si fue explícitamente marcado como ausente
+      consecutiveCount = 1;
+    }
+    // NOTA CLAVE: Si la fecha es hoy o futura o no ha tenido clase aún, NO suma falta por la fecha seleccionada
+
+    // 3. Revisar en orden hacia atrás las clases impartidas pasadas
     for (const d of pastDates) {
-      const rec = attendance.find(a => a.studentId === studentId && a.levelId === selectedLevelId && a.date === d);
+      const rec = attendance.find(
+        a => a.studentId === studentId && a.levelId === selectedLevelId && a.date === d
+      );
       if (!rec || rec.status === 'absent') {
         consecutiveCount++;
       } else if (rec.status === 'present') {
         break; // Rompe la racha de faltas
       }
     }
+
     return consecutiveCount;
   };
 
-  // Mapeo del estado de asistencia de cada alumno para la fecha seleccionada
+  // Mapeo detallado de estudiantes con su asistencia para la fecha seleccionada y su récord global
   const studentRows = useMemo(() => {
     return levelStudents.map(student => {
       const record = attendance.find(
@@ -82,38 +153,60 @@ export default function AbsenceTracker({ data }) {
       );
       
       const isPresent = record ? record.status === 'present' : false;
-      const pastConsecutive = calculateConsecutiveAbsences(student.id);
-      // Total de faltas acumulando hoy si no ha asistido
-      const totalConsecutive = isPresent ? 0 : pastConsecutive + 1;
+      const isAbsent = record ? record.status === 'absent' : false;
+      const isJustified = record ? record.status === 'justified' : false;
+      
+      const consecutiveAbsences = calculateConsecutiveAbsences(student.id);
+
+      // Conteo de asistencias en las clases ya dadas
+      const attendedHeldClasses = heldClassDates.filter(d => {
+        const r = attendance.find(a => a.studentId === student.id && a.levelId === selectedLevelId && a.date === d);
+        return r && r.status === 'present';
+      }).length + (isPresent && !heldClassDates.includes(selectedDate) ? 1 : 0);
+
+      const effectiveClassesGiven = heldClassDates.length + (!heldClassDates.includes(selectedDate) && isPresent ? 1 : 0);
+      const attendancePercent = effectiveClassesGiven > 0 ? Math.round((attendedHeldClasses / effectiveClassesGiven) * 100) : 100;
 
       return {
         student,
         record,
         isPresent,
-        pastConsecutive,
-        totalConsecutive,
+        isAbsent,
+        isJustified,
+        consecutiveAbsences,
+        attendedHeldClasses,
+        effectiveClassesGiven,
+        attendancePercent,
       };
     });
-  }, [levelStudents, attendance, selectedLevelId, selectedDate, distinctSessionDates]);
+  }, [levelStudents, attendance, selectedLevelId, selectedDate, heldClassDates, todayStr]);
 
-  // Resumen numérico
+  // Resumen estadístico
   const stats = useMemo(() => {
     const total = studentRows.length;
     const presents = studentRows.filter(r => r.isPresent).length;
-    const absents = total - presents;
+    const pendingToday = studentRows.filter(r => !r.isPresent && !r.isAbsent).length;
+    const absents = studentRows.filter(r => r.isAbsent || (!r.isPresent && selectedDate < todayStr && isSelectedDateHeld)).length;
     const percent = total > 0 ? Math.round((presents / total) * 100) : 0;
-    const atRisk = studentRows.filter(r => !r.isPresent && r.totalConsecutive >= 2).length;
+    const atRisk = studentRows.filter(r => r.consecutiveAbsences >= 2).length;
 
-    return { total, presents, absents, percent, atRisk };
-  }, [studentRows]);
+    return { total, presents, pendingToday, absents, percent, atRisk };
+  }, [studentRows, selectedDate, todayStr, isSelectedDateHeld]);
 
   // Filtrado de filas
   const filteredRows = useMemo(() => {
     if (statusFilter === 'PRESENT') return studentRows.filter(r => r.isPresent);
-    if (statusFilter === 'ABSENT') return studentRows.filter(r => !r.isPresent);
-    if (statusFilter === 'AT_RISK') return studentRows.filter(r => !r.isPresent && r.totalConsecutive >= 2);
+    if (statusFilter === 'ABSENT') {
+      return studentRows.filter(r => r.isAbsent || (!r.isPresent && (selectedDate < todayStr || isSelectedDateHeld)));
+    }
+    if (statusFilter === 'PENDING') {
+      return studentRows.filter(r => !r.isPresent && !r.isAbsent);
+    }
+    if (statusFilter === 'AT_RISK') {
+      return studentRows.filter(r => r.consecutiveAbsences >= 2);
+    }
     return studentRows;
-  }, [studentRows, statusFilter]);
+  }, [studentRows, statusFilter, selectedDate, todayStr, isSelectedDateHeld]);
 
   // Cambiar manualmente asistencia (marcar presente o ausente)
   const toggleAttendance = (studentId, currentIsPresent) => {
@@ -128,17 +221,19 @@ export default function AbsenceTracker({ data }) {
   };
 
   // Generador de enlace de WhatsApp con mensaje pastoral cariñoso
-  const getWhatsAppLink = (student, consecutive) => {
+  const getWhatsAppLink = (student, consecutive, isPresent) => {
     if (!student.phone) return null;
     const cleanPhone = student.phone.replace(/[^0-9]/g, '');
 
     const levelName = currentLevel?.name.split('-')[0].trim() || 'Discipulado';
-    let text = `Hola ${student.name.split(' ')[0]}, ¡Dios te bendiga! Te extrañamos hoy en nuestra clase de ${levelName}.`;
+    let text = `Hola ${student.name.split(' ')[0]}, ¡Dios te bendiga!`;
     
     if (consecutive >= 2) {
-      text += ` Notamos que no pudiste estar con nosotros las últimas clases y queríamos saber si todo está bien contigo y tu familia. ¿Podemos orar por ti en algo especial? Te enviamos un gran abrazo.`;
+      text += ` Notamos que no pudiste estar con nosotros en las últimas clases de ${levelName} y queríamos saber si todo está bien contigo y tu familia. ¿Podemos orar por ti en algo especial? Te enviamos un gran abrazo.`;
+    } else if (!isPresent) {
+      text += ` Te extrañamos hoy en nuestra clase de ${levelName}. Esperamos que todo esté bien. ¡Nos vemos con mucho gozo en la próxima clase! Un saludo fraternal.`;
     } else {
-      text += ` Esperamos que todo esté bien. ¡Nos vemos con mucho gozo en la próxima clase! Un saludo fraternal.`;
+      text += ` ¡Qué alegría contar con tu presencia en la clase de ${levelName}! Que tengas una semana muy bendecida.`;
     }
 
     return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
@@ -146,13 +241,27 @@ export default function AbsenceTracker({ data }) {
 
   return (
     <div>
-      {/* Encabezado y Selector de Nivel / Fecha */}
-      <div className="glass-panel" style={{ padding: '20px', marginBottom: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+      {/* Encabezado Principal y Selector de Nivel */}
+      <div className="glass-panel" style={{ padding: '22px', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '14px', marginBottom: '20px' }}>
           <div>
-            <h3 style={{ fontSize: '1.3rem' }}>Control de Asistencia e Inasistencias</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              Supervisa la asistencia por sesión, detecta estudiantes con faltas reiteradas y haz seguimiento pastoral.
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                background: 'var(--c-sky-lightest)',
+                color: '#2A5D8A',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Calendar size={20} />
+              </div>
+              <h3 style={{ fontSize: '1.35rem', margin: 0 }}>Control de Asistencia e Inasistencias</h3>
+            </div>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', margin: '4px 0 0 0' }}>
+              Seguimiento por sesiones reales asignadas. Las faltas solo se contabilizan sobre clases ya impartidas.
             </p>
           </div>
 
@@ -160,60 +269,213 @@ export default function AbsenceTracker({ data }) {
             className="btn btn-outline btn-sm"
             onClick={() => exportExcelReport(selectedLevelId)}
             title="Descargar historial de este nivel en Excel (.xlsx)"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
           >
             <Download size={15} /> Exportar Excel
           </button>
         </div>
 
-        {/* Filtros de Nivel y Fecha */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+        {/* Selector de Nivel y Ficha Informativa del Nivel */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '18px', marginBottom: '18px' }}>
+          {/* Selector de Nivel */}
           <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label">Nivel de Discipulado</label>
+            <label className="form-label" style={{ fontWeight: '700', fontSize: '0.85rem' }}>
+              Seleccionar Nivel de Discipulado
+            </label>
             <select
               className="form-select"
               value={selectedLevelId}
-              onChange={(e) => setSelectedLevelId(e.target.value)}
+              onChange={(e) => handleLevelChange(e.target.value)}
+              style={{ fontSize: '0.95rem', padding: '10px 14px', fontWeight: '600' }}
             >
               {levels.map(l => (
                 <option key={l.id} value={l.id}>{l.name}</option>
               ))}
             </select>
+
+            {/* Días y Horarios asignados para este nivel */}
+            <div style={{ marginTop: '10px', fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <Clock size={13} color="#3b82f6" /> 
+                <strong>Día y Horario:</strong> {currentLevel?.dayOfWeek || 'Sin día'} ({currentLevel?.time || 'Horario por definir'})
+              </span>
+              {currentLevel?.room && (
+                <span>• <strong>Lugar:</strong> {currentLevel.room}</span>
+              )}
+            </div>
+
+            {/* Profesores del Nivel */}
+            <div style={{ marginTop: '6px', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              <strong>Profesor(es):</strong> {currentTeachers.length > 0 
+                ? currentTeachers.map(t => t.name).join(', ') 
+                : 'Sin profesor asignado'}
+            </div>
           </div>
 
-          <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label">Fecha de la Clase / Sesión</label>
+          {/* Tarjeta de Progreso del Nivel: Clases dadas vs faltantes */}
+          <div style={{ 
+            background: 'var(--c-sky-lightest)', 
+            padding: '16px 20px', 
+            borderRadius: '12px', 
+            border: '1.5px solid var(--border-card)' 
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase', color: '#1A365D' }}>
+                Progreso del Nivel
+              </span>
+              <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#2563eb' }}>
+                {levelProgressPercent}% completado
+              </span>
+            </div>
+
+            {/* Métricas: Dadas, Faltan, Total */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', textAlign: 'center', marginBottom: '10px' }}>
+              <div style={{ background: '#FFFFFF', padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--border-card)' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: '600' }}>Clases Dadas</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: '800', color: '#10b981' }}>{classesGiven}</div>
+              </div>
+              <div style={{ background: '#FFFFFF', padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--border-card)' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: '600' }}>Faltan</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: '800', color: '#f59e0b' }}>{classesRemaining}</div>
+              </div>
+              <div style={{ background: '#FFFFFF', padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--border-card)' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: '600' }}>Total Curso</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: '800', color: '#1e293b' }}>{totalClasses}</div>
+              </div>
+            </div>
+
+            {/* Barra de Progreso Visual */}
+            <div style={{ height: '8px', background: 'rgba(0,0,0,0.06)', borderRadius: '999px', overflow: 'hidden' }}>
+              <div 
+                style={{ 
+                  height: '100%', 
+                  width: `${levelProgressPercent}%`, 
+                  background: 'linear-gradient(90deg, #3b82f6, #10b981)',
+                  borderRadius: '999px',
+                  transition: 'width 0.4s ease'
+                }} 
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Barra de Selección de Sesión / Fecha de la Clase */}
+        <div style={{ 
+          display: 'flex', 
+          flexWrap: 'wrap', 
+          alignItems: 'center', 
+          justifyContent: 'space-between', 
+          gap: '14px',
+          paddingTop: '16px',
+          borderTop: '1px solid var(--border-card)'
+        }}>
+          {/* Selector de Sesiones Impartidas */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-main)' }}>
+              Sesión a Visualizar:
+            </span>
+
+            {heldClassDates.length > 0 && (
+              <select
+                className="form-select form-select-sm"
+                value={heldClassDates.includes(selectedDate) ? selectedDate : ''}
+                onChange={(e) => {
+                  if (e.target.value) setSelectedDate(e.target.value);
+                }}
+                style={{ width: 'auto', minWidth: '220px', fontWeight: '600' }}
+              >
+                <option value="" disabled>Seleccionar clase impartida...</option>
+                {heldClassDates.map((date, idx) => {
+                  const attendees = attendance.filter(a => a.levelId === selectedLevelId && a.date === date && a.status === 'present').length;
+                  const isLatest = idx === 0;
+                  return (
+                    <option key={date} value={date}>
+                      {isLatest ? '⭐ Última clase: ' : '📅 '} {date} ({attendees} asistentes)
+                    </option>
+                  );
+                })}
+              </select>
+            )}
+
+            {/* Botón rápido para ir a la clase de Hoy */}
+            <button
+              type="button"
+              className={`btn btn-sm ${selectedDate === todayStr ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setSelectedDate(todayStr)}
+            >
+              🟢 Clase de Hoy ({todayStr})
+            </button>
+          </div>
+
+          {/* Selector Manual de Fecha */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: '600' }}>
+              Fecha específica:
+            </label>
             <input
               type="date"
               className="form-input"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
+              style={{ width: 'auto', padding: '6px 12px', fontSize: '0.85rem' }}
             />
           </div>
         </div>
+
+        {/* Indicador contextual de la fecha seleccionada */}
+        <div style={{ marginTop: '12px', fontSize: '0.82rem' }}>
+          {isSelectedDateHeld ? (
+            <span style={{ color: '#059669', display: 'inline-flex', alignItems: 'center', gap: '5px', fontWeight: '600' }}>
+              <CheckCircle size={14} /> Clase impartida registrada el {selectedDate} ({stats.presents} alumnos asistieron)
+            </span>
+          ) : isToday ? (
+            <span style={{ color: '#2563eb', display: 'inline-flex', alignItems: 'center', gap: '5px', fontWeight: '600' }}>
+              <Clock size={14} /> Sesión de hoy en curso / abierta. Los alumnos pendientes no computan falta hasta cerrar asistencia.
+            </span>
+          ) : isFuture ? (
+            <span style={{ color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <Calendar size={14} /> Fecha futura programada ({selectedDate}). Clase aún no impartida.
+            </span>
+          ) : (
+            <span style={{ color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <Info size={14} /> Fecha sin registros previos de asistencia para este nivel.
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* Tarjetas de Métricas de la Sesión */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+      {/* Tarjetas de Métricas de la Sesión Seleccionada */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         <div className="glass-panel" style={{ padding: '16px', textAlign: 'center' }}>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700' }}>Inscritos</span>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700' }}>
+            Alumnos Activos
+          </span>
           <div style={{ fontSize: '1.8rem', fontWeight: '800', marginTop: '4px' }}>{stats.total}</div>
         </div>
 
         <div className="glass-panel" style={{ padding: '16px', textAlign: 'center', borderColor: 'rgba(16, 185, 129, 0.3)' }}>
-          <span style={{ fontSize: '0.78rem', color: '#34d399', textTransform: 'uppercase', fontWeight: '700' }}>Presentes Hoy</span>
-          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#34d399', marginTop: '4px' }}>
-            {stats.presents} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>({stats.percent}%)</span>
+          <span style={{ fontSize: '0.78rem', color: '#10b981', textTransform: 'uppercase', fontWeight: '700' }}>
+            Presentes
+          </span>
+          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#10b981', marginTop: '4px' }}>
+            {stats.presents} <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>({stats.percent}%)</span>
           </div>
         </div>
 
-        <div className="glass-panel" style={{ padding: '16px', textAlign: 'center', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
-          <span style={{ fontSize: '0.78rem', color: '#f87171', textTransform: 'uppercase', fontWeight: '700' }}>Ausentes Hoy</span>
-          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#f87171', marginTop: '4px' }}>{stats.absents}</div>
+        <div className="glass-panel" style={{ padding: '16px', textAlign: 'center', borderColor: isToday ? 'rgba(59, 130, 246, 0.3)' : 'rgba(239, 68, 68, 0.3)' }}>
+          <span style={{ fontSize: '0.78rem', color: isToday ? '#3b82f6' : '#ef4444', textTransform: 'uppercase', fontWeight: '700' }}>
+            {isToday ? 'Pendientes de Fichar' : 'Ausentes'}
+          </span>
+          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: isToday ? '#3b82f6' : '#ef4444', marginTop: '4px' }}>
+            {isToday ? stats.pendingToday : stats.absents}
+          </div>
         </div>
 
         <div className="glass-panel" style={{ padding: '16px', textAlign: 'center', borderColor: stats.atRisk > 0 ? 'rgba(245, 158, 11, 0.5)' : 'var(--border-card)' }}>
-          <span style={{ fontSize: '0.78rem', color: '#fbbf24', textTransform: 'uppercase', fontWeight: '700' }}>Faltas Reiteradas</span>
-          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#fbbf24', marginTop: '4px' }}>
+          <span style={{ fontSize: '0.78rem', color: '#d97706', textTransform: 'uppercase', fontWeight: '700' }}>
+            En Riesgo (≥2 faltas)
+          </span>
+          <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#d97706', marginTop: '4px' }}>
             {stats.atRisk}
           </div>
         </div>
@@ -233,12 +495,21 @@ export default function AbsenceTracker({ data }) {
         >
           Presentes ({stats.presents})
         </button>
-        <button
-          className={`btn btn-sm ${statusFilter === 'ABSENT' ? 'btn-primary' : 'btn-outline'}`}
-          onClick={() => setStatusFilter('ABSENT')}
-        >
-          Ausentes ({stats.absents})
-        </button>
+        {isToday ? (
+          <button
+            className={`btn btn-sm ${statusFilter === 'PENDING' ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => setStatusFilter('PENDING')}
+          >
+            Pendientes ({stats.pendingToday})
+          </button>
+        ) : (
+          <button
+            className={`btn btn-sm ${statusFilter === 'ABSENT' ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => setStatusFilter('ABSENT')}
+          >
+            Ausentes ({stats.absents})
+          </button>
+        )}
         <button
           className={`btn btn-sm ${statusFilter === 'AT_RISK' ? 'btn-primary' : 'btn-outline'}`}
           onClick={() => setStatusFilter('AT_RISK')}
@@ -256,14 +527,24 @@ export default function AbsenceTracker({ data }) {
               <th style={{ padding: '12px 16px' }}>Estudiante</th>
               <th style={{ padding: '12px 16px' }}>Estado para {selectedDate}</th>
               <th style={{ padding: '12px 16px' }}>Hora Fichaje</th>
+              <th style={{ padding: '12px 16px' }}>Asistencia en Clases Dadas</th>
               <th style={{ padding: '12px 16px' }}>Faltas Consecutivas</th>
               <th style={{ padding: '12px 16px', textAlign: 'right' }}>Seguimiento WhatsApp</th>
             </tr>
           </thead>
           <tbody>
             {filteredRows.length > 0 ? (
-              filteredRows.map(({ student, record, isPresent, totalConsecutive }) => {
-                const waLink = getWhatsAppLink(student, totalConsecutive);
+              filteredRows.map(({ 
+                student, 
+                record, 
+                isPresent, 
+                isAbsent, 
+                consecutiveAbsences, 
+                attendedHeldClasses, 
+                effectiveClassesGiven, 
+                attendancePercent 
+              }) => {
+                const waLink = getWhatsAppLink(student, consecutiveAbsences, isPresent);
                 const timeStr = record?.timestamp 
                   ? new Date(record.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
                   : '—';
@@ -273,10 +554,11 @@ export default function AbsenceTracker({ data }) {
                     key={student.id} 
                     style={{ 
                       borderBottom: '1px solid var(--border-card)',
-                      background: !isPresent && totalConsecutive >= 2 ? '#FEF2F2' : 'transparent',
+                      background: consecutiveAbsences >= 2 ? '#FEF2F2' : 'transparent',
                       transition: 'background 0.15s ease'
                     }}
                   >
+                    {/* Estudiante */}
                     <td style={{ padding: '12px 16px' }}>
                       <div style={{ fontWeight: '700', color: 'var(--text-main)' }}>{student.name}</div>
                       <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
@@ -289,61 +571,96 @@ export default function AbsenceTracker({ data }) {
                       <button
                         type="button"
                         onClick={() => toggleAttendance(student.id, isPresent)}
-                        className={`btn btn-sm ${isPresent ? 'btn-success' : 'btn-danger-outline'}`}
-                        style={{ padding: '6px 12px', fontSize: '0.82rem' }}
+                        className={`btn btn-sm ${isPresent ? 'btn-success' : 'btn-outline'}`}
+                        style={{ 
+                          padding: '6px 12px', 
+                          fontSize: '0.82rem',
+                          borderColor: isPresent ? undefined : isAbsent ? '#ef4444' : undefined,
+                          color: isPresent ? undefined : isAbsent ? '#ef4444' : undefined
+                        }}
                       >
                         {isPresent ? (
                           <>
                             <CheckCircle size={14} /> Presente
                           </>
+                        ) : isAbsent ? (
+                          <>
+                            <XCircle size={14} /> Falta (Clic marcar presente)
+                          </>
+                        ) : isToday ? (
+                          <>
+                            <Clock size={14} /> Marcar Presente
+                          </>
                         ) : (
                           <>
-                            <XCircle size={14} /> Marcar Presente
+                            <CheckCircle size={14} /> Marcar Presente
                           </>
                         )}
                       </button>
                     </td>
 
+                    {/* Hora de Fichaje */}
                     <td style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                       {isPresent ? (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#34d399' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#10b981', fontWeight: '600' }}>
                           <Clock size={13} /> {timeStr} ({record?.checkedInBy === 'student_self' ? 'Móvil Alumno' : 'Profesor'})
                         </span>
+                      ) : isAbsent ? (
+                        <span style={{ color: '#ef4444', fontWeight: '600' }}>Marcado Ausente</span>
+                      ) : isToday ? (
+                        <span style={{ color: '#3b82f6', fontStyle: 'italic' }}>Pendiente de fichar</span>
+                      ) : isSelectedDateHeld ? (
+                        <span style={{ color: '#ef4444' }}>No asistió</span>
                       ) : (
-                        <span style={{ color: 'var(--text-faint)' }}>No ha fichado</span>
+                        <span style={{ color: 'var(--text-faint)' }}>Sin registro</span>
                       )}
                     </td>
 
-                    {/* Semáforo de Faltas */}
+                    {/* Asistencia Acumulada en Clases Dadas */}
                     <td style={{ padding: '12px 16px' }}>
-                      {isPresent ? (
-                        <span className="badge badge-present">Asistió</span>
-                      ) : totalConsecutive >= 2 ? (
-                        <span className="badge badge-absent" title="Alerta: 2 o más faltas seguidas">
-                          <AlertCircle size={12} /> {totalConsecutive} faltas seguidas (Alerta)
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontWeight: '700', fontSize: '0.88rem', color: attendancePercent >= 75 ? '#059669' : attendancePercent >= 50 ? '#d97706' : '#dc2626' }}>
+                          {attendedHeldClasses} de {effectiveClassesGiven}
+                        </span>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                          ({attendancePercent}%)
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        {classesRemaining > 0 ? `Quedan ${classesRemaining} clases del curso` : 'Curso completado'}
+                      </div>
+                    </td>
+
+                    {/* Semáforo de Faltas Consecutivas */}
+                    <td style={{ padding: '12px 16px' }}>
+                      {consecutiveAbsences >= 2 ? (
+                        <span className="badge badge-absent" title="Alerta pastoral: 2 o más faltas seguidas en clases impartidas">
+                          <AlertCircle size={12} /> {consecutiveAbsences} faltas seguidas (Alerta)
+                        </span>
+                      ) : consecutiveAbsences === 1 ? (
+                        <span className="badge badge-warning" title="1 falta en la última clase impartida">
+                          1 falta previa
                         </span>
                       ) : (
-                        <span className="badge badge-warning">
-                          1 falta
+                        <span className="badge badge-present" title="Estudiante al día">
+                          ✓ Al día (0 faltas)
                         </span>
                       )}
                     </td>
 
                     {/* Botón WhatsApp de Seguimiento Pastoral */}
                     <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                      {!isPresent && student.phone ? (
+                      {student.phone ? (
                         <a
                           href={waLink}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="btn btn-whatsapp btn-sm"
-                          style={{ textDecoration: 'none' }}
+                          style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                           title="Contactar con mensaje pastoral prediseñado"
                         >
                           <MessageCircle size={14} /> Contactar
                         </a>
-                      ) : isPresent ? (
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-faint)' }}>Al día</span>
                       ) : (
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-faint)' }}>Sin teléfono</span>
                       )}
@@ -353,7 +670,7 @@ export default function AbsenceTracker({ data }) {
               })
             ) : (
               <tr>
-                <td colSpan="5" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <td colSpan="6" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
                   No hay estudiantes que coincidan con el filtro seleccionado.
                 </td>
               </tr>
@@ -364,3 +681,4 @@ export default function AbsenceTracker({ data }) {
     </div>
   );
 }
+

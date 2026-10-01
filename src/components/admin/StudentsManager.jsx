@@ -5,6 +5,9 @@ import StudentControlSheet from './StudentControlSheet';
 
 export default function StudentsManager({ data, currentTeacher = null }) {
   const { students = [], levels = [], attendance = [] } = data;
+
+  // Solo el admin (currentTeacher === null) puede ver contraseñas de estudiantes
+  const isAdmin = currentTeacher === null;
   const [searchTerm, setSearchTerm] = useState('');
   const [filterLevelId, setFilterLevelId] = useState('ALL');
   const [filterStatus, setFilterStatus] = useState('active');
@@ -159,12 +162,16 @@ export default function StudentsManager({ data, currentTeacher = null }) {
         <div>
           <h3 style={{ fontSize: '1.3rem' }}>Estudiantes Inscritos ({students.length})</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-            Inscribe nuevos estudiantes, asígnalos o promuévelos de nivel y mantén sus datos de contacto.
+            {isAdmin
+              ? 'Inscribe nuevos estudiantes, asígnalos o promuévelos de nivel y mantén sus datos de contacto.'
+              : 'Consulta el listado de estudiantes de tus niveles asignados.'}
           </p>
         </div>
-        <button className="btn btn-primary" onClick={openNewModal}>
-          <Plus size={18} /> Inscribir Estudiante
-        </button>
+        {isAdmin && (
+          <button className="btn btn-primary" onClick={openNewModal}>
+            <Plus size={18} /> Inscribir Estudiante
+          </button>
+        )}
       </div>
 
       {/* Barra de Filtros y Búsqueda */}
@@ -215,7 +222,7 @@ export default function StudentsManager({ data, currentTeacher = null }) {
             <tr style={{ borderBottom: '1.5px solid var(--border-card)', background: 'var(--c-sky-lightest)', color: '#1A365D' }}>
               <th style={{ padding: '12px 16px' }}>Estudiante</th>
               <th style={{ padding: '12px 16px' }}>Nivel Asignado</th>
-              <th style={{ padding: '12px 16px' }}>Contraseña</th>
+              {isAdmin && <th style={{ padding: '12px 16px' }}>Contraseña</th>}
               <th style={{ padding: '12px 16px' }}>Asistencias</th>
               <th style={{ padding: '12px 16px', textAlign: 'center' }}>Estado</th>
               <th style={{ padding: '12px 16px', textAlign: 'right' }}>Acciones</th>
@@ -283,11 +290,13 @@ export default function StudentsManager({ data, currentTeacher = null }) {
                         <BookOpen size={12} /> {level?.name.split('-')[0].trim() || 'Sin Nivel'}
                       </span>
                     </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <span style={{ fontFamily: 'monospace', color: '#a5b4fc', background: 'rgba(99, 102, 241, 0.1)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.82rem' }}>
-                        {student.password || '0000'}
-                      </span>
-                    </td>
+                    {isAdmin && (
+                      <td style={{ padding: '12px 16px' }}>
+                        <span style={{ fontFamily: 'monospace', color: '#a5b4fc', background: 'rgba(99, 102, 241, 0.1)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.82rem' }}>
+                          {student.password || '0000'}
+                        </span>
+                      </td>
+                    )}
                     <td style={{ padding: '12px 16px' }}>
                       <span className="badge badge-present">
                         {presents} clases
@@ -404,17 +413,18 @@ export default function StudentsManager({ data, currentTeacher = null }) {
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div className="form-group">
-                    <label className="form-label">Contraseña para Fichar *</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      required
-                      placeholder="0000"
-                      value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    />
-                  </div>
+                  {isAdmin && (
+                    <div className="form-group">
+                      <label className="form-label">Contraseña para Fichar *</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="0000"
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      />
+                    </div>
+                  )}
 
                   <div className="form-group">
                     <label className="form-label">Estado</label>
