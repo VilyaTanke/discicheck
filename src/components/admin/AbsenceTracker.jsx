@@ -24,13 +24,33 @@ import {
 import { storageService } from '../../services/storageService';
 import { exportExcelReport } from '../../services/excelExportService';
 
-export default function AbsenceTracker({ data }) {
+export default function AbsenceTracker({ data, currentTeacher = null }) {
   const { levels = [], students = [], attendance = [], teachers = [] } = data;
+
+  // Determinar si quien visualiza es admin (sin currentTeacher) o profesor
+  const isAdmin = currentTeacher === null;
+
+  // Niveles visibles: si es profesor, solo los que tiene asignados
+  const visibleLevels = useMemo(() => {
+    if (isAdmin) return levels;
+    return levels.filter(l =>
+      (Array.isArray(l.teacherIds) && l.teacherIds.includes(currentTeacher?.id)) ||
+      l.teacherId === currentTeacher?.id
+    );
+  }, [levels, isAdmin, currentTeacher]);
 
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
-  // Nivel seleccionado (por defecto el primero disponible)
-  const [selectedLevelId, setSelectedLevelId] = useState(() => levels[0]?.id || '');
+  // Nivel seleccionado (por defecto el primero de los niveles visibles)
+  const [selectedLevelId, setSelectedLevelId] = useState(() => {
+    const firstLevel = isAdmin ? levels[0] : (
+      levels.find(l =>
+        (Array.isArray(l.teacherIds) && l.teacherIds.includes(currentTeacher?.id)) ||
+        l.teacherId === currentTeacher?.id
+      )
+    );
+    return firstLevel?.id || '';
+  });
 
   // Fechas reales en las que se han impartido clases para este nivel (donde hay al menos un registro de fichaje/asistencia)
   const heldClassDates = useMemo(() => {
@@ -45,7 +65,13 @@ export default function AbsenceTracker({ data }) {
 
   // Fecha seleccionada: por defecto hoy si ya hay fichajes hoy, o la última clase impartida, o hoy
   const [selectedDate, setSelectedDate] = useState(() => {
-    const firstLvlId = levels[0]?.id;
+    const firstLevel = isAdmin ? levels[0] : (
+      levels.find(l =>
+        (Array.isArray(l.teacherIds) && l.teacherIds.includes(currentTeacher?.id)) ||
+        l.teacherId === currentTeacher?.id
+      )
+    );
+    const firstLvlId = firstLevel?.id;
     const lvlDates = Array.from(new Set(
       attendance.filter(a => a.levelId === firstLvlId).map(a => a.date)
     )).sort().reverse();
@@ -287,10 +313,15 @@ export default function AbsenceTracker({ data }) {
               value={selectedLevelId}
               onChange={(e) => handleLevelChange(e.target.value)}
               style={{ fontSize: '0.95rem', padding: '10px 14px', fontWeight: '600' }}
+              disabled={visibleLevels.length === 0}
             >
-              {levels.map(l => (
-                <option key={l.id} value={l.id}>{l.name}</option>
-              ))}
+              {visibleLevels.length === 0 ? (
+                <option value="">Sin niveles asignados</option>
+              ) : (
+                visibleLevels.map(l => (
+                  <option key={l.id} value={l.id}>{l.name}</option>
+                ))
+              )}
             </select>
 
             {/* Días y Horarios asignados para este nivel */}

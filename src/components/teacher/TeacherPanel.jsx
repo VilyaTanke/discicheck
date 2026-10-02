@@ -131,7 +131,7 @@ export default function TeacherPanel({ data, currentTeacher, onLogout }) {
       </div>
 
       {/* Renderizado de la pestaña activa (Solo Inasistencias y Estudiantes) */}
-      {activeTab === 'attendance' && <AbsenceTracker data={data} />}
+      {activeTab === 'attendance' && <AbsenceTracker data={data} currentTeacher={currentTeacher} />}
       {activeTab === 'students' && <StudentsManager data={data} currentTeacher={currentTeacher} />}
     </div>
   );
