@@ -8,6 +8,18 @@ export default function StudentsManager({ data, currentTeacher = null }) {
 
   // Solo el admin (currentTeacher === null) puede ver contraseñas de estudiantes
   const isAdmin = currentTeacher === null;
+
+  // IDs de los niveles asignados al profesor actual (vacío = admin ve todos)
+  const assignedLevelIds = isAdmin
+    ? null // null = sin restricción
+    : new Set(
+        levels
+          .filter(l =>
+            (Array.isArray(l.teacherIds) && l.teacherIds.includes(currentTeacher?.id)) ||
+            l.teacherId === currentTeacher?.id
+          )
+          .map(l => l.id)
+      );
   const [searchTerm, setSearchTerm] = useState('');
   const [filterLevelId, setFilterLevelId] = useState('ALL');
   const [filterStatus, setFilterStatus] = useState('active');
@@ -46,7 +58,9 @@ export default function StudentsManager({ data, currentTeacher = null }) {
 
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
-      // Filtro por nivel
+      // Restricción por niveles asignados al profesor (si no es admin)
+      if (!isAdmin && assignedLevelIds && !assignedLevelIds.has(s.levelId)) return false;
+      // Filtro por nivel seleccionado en el selector
       if (filterLevelId !== 'ALL' && s.levelId !== filterLevelId) return false;
       // Filtro por estado
       if (filterStatus !== 'ALL' && s.status !== filterStatus) return false;
@@ -60,7 +74,7 @@ export default function StudentsManager({ data, currentTeacher = null }) {
       }
       return true;
     });
-  }, [students, filterLevelId, filterStatus, searchTerm]);
+  }, [students, filterLevelId, filterStatus, searchTerm, isAdmin, assignedLevelIds]);
 
   const openNewModal = () => {
     setEditingStudent(null);
@@ -160,7 +174,9 @@ export default function StudentsManager({ data, currentTeacher = null }) {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
         <div>
-          <h3 style={{ fontSize: '1.3rem' }}>Estudiantes Inscritos ({students.length})</h3>
+          <h3 style={{ fontSize: '1.3rem' }}>
+            Estudiantes Inscritos ({isAdmin ? students.length : filteredStudents.length})
+          </h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
             {isAdmin
               ? 'Inscribe nuevos estudiantes, asígnalos o promuévelos de nivel y mantén sus datos de contacto.'
@@ -173,6 +189,35 @@ export default function StudentsManager({ data, currentTeacher = null }) {
           </button>
         )}
       </div>
+
+      {/* Banner informativo para profesores: acceso restringido a sus niveles */}
+      {!isAdmin && (
+        <div style={{
+          background: 'rgba(59, 130, 246, 0.06)',
+          border: '1.5px solid rgba(59, 130, 246, 0.2)',
+          borderRadius: '10px',
+          padding: '12px 18px',
+          marginBottom: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          fontSize: '0.85rem',
+          color: '#1e40af'
+        }}>
+          <BookOpen size={16} color="#3b82f6" style={{ flexShrink: 0 }} />
+          <span>
+            <strong>Vista restringida a tus niveles:</strong>{' '}
+            {assignedLevelIds && assignedLevelIds.size > 0
+              ? levels.filter(l => assignedLevelIds.has(l.id)).map(l => l.name.split('-')[0].trim()).join(', ')
+              : 'Sin niveles asignados actualmente.'}
+            {assignedLevelIds && assignedLevelIds.size > 0 && (
+              <span style={{ color: '#6b7280', marginLeft: '8px' }}>
+                ({filteredStudents.length} alumno{filteredStudents.length !== 1 ? 's' : ''} en total)
+              </span>
+            )}
+          </span>
+        </div>
+      )}
 
       {/* Barra de Filtros y Búsqueda */}
       <div className="glass-panel" style={{ padding: '16px', marginBottom: '16px', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
@@ -195,8 +240,9 @@ export default function StudentsManager({ data, currentTeacher = null }) {
             value={filterLevelId}
             onChange={(e) => setFilterLevelId(e.target.value)}
           >
-            <option value="ALL">Todos los Niveles</option>
-            {levels.map(l => (
+            <option value="ALL">{isAdmin ? 'Todos los Niveles' : 'Mis Niveles (Todos)'}</option>
+            {/* Para profesor: solo mostrar los niveles donde está asignado */}
+            {(isAdmin ? levels : levels.filter(l => assignedLevelIds?.has(l.id))).map(l => (
               <option key={l.id} value={l.id}>{l.name.split('-')[0].trim()}</option>
             ))}
           </select>
